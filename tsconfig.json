@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/cui.ts"],
+  "exclude": ["node_modules", "src/template"]
+}

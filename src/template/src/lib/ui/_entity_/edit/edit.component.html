@@ -1,0 +1,27 @@
+<default-actions
+  [disabled]="{
+    save: formGroup.invalid
+  }"
+></default-actions>
+
+<div class="animated fadeIn">
+  <form novalidate autocomplete="off" [formGroup]="formGroup">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header">
+            <strong>Update _Entity_</strong>
+          </div>
+          <div class="card-body">
+            <div class="form-group required">
+              <with-validation>
+                <label class="form-label">Name</label>
+                <input validate type="text" formControlName="name" class="form-control" placeholder="Name" readonly noWhiteSpace required />
+              </with-validation>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>

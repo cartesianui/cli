@@ -1,0 +1,46 @@
+import { Injectable } from '@angular/core';
+import { Actions } from '@ngrx/effects';
+import { _Entity_HttpService } from '../shared';
+import { _Entity_Actions } from './_entity_.actions';
+import { BaseEntityEffects } from '@cartesianui/common';
+import { _Entity_, _Entity_Search } from '../models';
+import { RequestCriteria } from '@cartesianui/core';
+
+@Injectable()
+export class _Entity_Effects extends BaseEntityEffects<_Entity_, RequestCriteria<_Entity_Search>, typeof _Entity_Actions> {
+  constructor(
+    actions$: Actions,
+    httpService: _Entity_HttpService
+  ) {
+    super(httpService, _Entity_Actions);
+  }
+
+  // Can override methods here if needed
+  // Example of overriding a method
+  // fetchEntities$ = createEffect(() =>
+  //   this.actions$.pipe(
+  //     ofType(EntityActions.fetchEntities),
+  //     map(({ criteria }) => criteria),
+  //     switchMap((criteria) => {      
+  //       return this.httpService.getAll(criteria).pipe(
+  //         map(({ data, meta }) => EntityActions.loadEntities({ entities: data, meta })),
+  //         catchError((error) => of(EntityActions.fetchEntitiesFailure({ error })))
+  //       );
+  //     })
+  //   )
+  // ); 
+
+  // activateEntity$ = createEffect(() =>
+  //   this.actions$.pipe(
+  //     ofType(EntityActions.activateEntity),
+  //     switchMap(({ id }) =>
+  //       this.httpService.activate(id).pipe(
+  //         map(({ data }) => EntityActions.activateEntitySuccess({ entity: data })),
+  //         catchError(({ message, errors }) =>
+  //           of(EntityActions.activateEntityFailure({ message, errors }))
+  //         )
+  //       )
+  //     )
+  //   )
+  // );
+}

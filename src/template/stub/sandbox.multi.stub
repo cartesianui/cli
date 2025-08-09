@@ -1,0 +1,27 @@
+    // -------------------------------------------------------------------------
+    //                  _Entity_ Store, State and Functions
+    // -------------------------------------------------------------------------
+    public _entityName_Entities$ = this.store.pipe(select(from_Entity_.entities));
+    public _entityName_Meta$ = this.store.pipe(select(from_Entity_.meta));
+    public _entityName_Selected$ = this.store.pipe(select(from_Entity_.selected));
+    public _entityName_CreationState$ = this.store.pipe(select(from_Entity_.creation));
+
+    fetchAll_PEntity_ = (criteria: RequestCriteria<_Entity_Search>): void => {
+        this.store.dispatch(_Entity_Actions.fetchAll({ criteria: criteria }));
+    };
+
+    select_Entity_ = (entity: _Entity_): void => {
+        this.store.dispatch(_Entity_Actions.select({ entity }));
+    };
+
+    create_Entity_ = (entity: _Entity_): void => {
+        this.store.dispatch(_Entity_Actions.create({ entity }));
+    };
+
+    update_Entity_ = (id: string, entity: _Entity_): void => {
+        this.store.dispatch(_Entity_Actions.update({ entity: { id, changes: entity } }));
+    };
+
+    delete_Entity_ = (id: string): void => {
+        this.store.dispatch(_Entity_Actions.delete({ id }));
+    };
