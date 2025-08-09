@@ -114,6 +114,17 @@ function askConfirmation(message) {
   });
 }
 
+async function getOverwritePermission() {
+  logWarning(`This will add or update files in:\n → ${__destPath}`);
+
+  const confirmed = await askConfirmation('Do you want to continue?');
+  if (!confirmed) {
+    logError('Operation cancelled.');
+    process.exit(0);
+  }
+}
+
+
 //==========================================================================================
 //                                      UTILS
 //==========================================================================================
@@ -1041,7 +1052,7 @@ namedFlags.forEach(flag => {
 // Extract specific named args
 const library = flagMap.lib;
 const entities = flagMap.entities?.split(',') || [];
-const dest = flagMap.dest || library;
+const dest = flagMap.dest || library || '';
 
 // ✅ Destination path (relative to where user runs the CLI)
 __destPath =  path.join(process.cwd(), dest);
@@ -1050,14 +1061,6 @@ __destPath =  path.join(process.cwd(), dest);
 __tplPath = flagMap.tpl || path.join(__dirname, 'template');
 
 // console.log({command, subcommand, library, entities });
-
-logWarning(`This will add or update files in:\n → ${__destPath}`);
-
-const confirmed = await askConfirmation('Do you want to continue?');
-if (!confirmed) {
-  logError('Operation cancelled.');
-  process.exit(0);
-}
 
 validateCommand(command);
 switch (command) {
@@ -1068,6 +1071,7 @@ switch (command) {
       case 'library':
           validateLibrary(command, subcommand, library);
           validateEntities(command, subcommand, library, entities);
+          await getOverwritePermission();
           generateLibrary(library, entities);
         break;
       
@@ -1085,6 +1089,7 @@ switch (command) {
     switch (subcommand) {
       case 'model':
           //validateEntities(command, subcommand, library, entities);
+          await getOverwritePermission();
           enhanceModels(library);
         break;
       
@@ -1101,6 +1106,7 @@ switch (command) {
     switch (subcommand) {
       case 'entity':
           validateEntities(command, subcommand, library, entities);
+          await getOverwritePermission();
           addEntity(library, entities)
         break;
       
