@@ -1,10 +1,17 @@
     // -------------------------------------------------------------------------
     //                  _Entity_ Store, State and Functions
     // -------------------------------------------------------------------------
-    public _entityName_Entities$ = this.store.pipe(select(from_Entity_.entities));
+    public _PentityName_$ = this.store.pipe(
+        select(from_Entity_.entities),
+        map((entities) => entities.map(e => new _Entity_(e)))
+    );
     public _entityName_Meta$ = this.store.pipe(select(from_Entity_.meta));
     public _entityName_Selected$ = this.store.pipe(select(from_Entity_.selected));
-    public _entityName_CreationState$ = this.store.pipe(select(from_Entity_.creation));
+    public _entityName_RequestState$ = this.store.pipe(select(from_Entity_.request));
+    public _entityName_CreateState$ = this.store.pipe(select(from_Entity_.create));
+    public _entityName_UpdateState$ = this.store.pipe(select(from_Entity_.update));
+    public _entityName_DeleteState$ = this.store.pipe(select(from_Entity_.delete));
+    public _entityName_GetState$ = this.store.pipe(select(from_Entity_.get));
 
     fetchAll_PEntity_ = (criteria: RequestCriteria<_Entity_Search>): void => {
         this.store.dispatch(_Entity_Actions.fetchAll({ criteria: criteria }));
@@ -25,3 +32,36 @@
     delete_Entity_ = (id: string): void => {
         this.store.dispatch(_Entity_Actions.delete({ id }));
     };
+
+    clear_Entity_RequestState = (type: RequestTypes): void => {
+        switch (type) {
+            case RequestType.Get:
+                this.store.dispatch(_Entity_Actions.clearGet());
+                break;
+
+            case RequestType.Create:
+                this.store.dispatch(_Entity_Actions.clearCreate());
+                break;
+
+            case RequestType.Update:
+                this.store.dispatch(_Entity_Actions.clearUpdate());
+                break;
+
+            case RequestType.Delete:
+                this.store.dispatch(_Entity_Actions.clearDelete());
+                break;
+
+            case RequestType.Request:
+                this.store.dispatch(_Entity_Actions.clearRequest());
+                break;
+
+            case RequestType.All:
+                this.store.dispatch(_Entity_Actions.clearAllRequests());
+                break;
+
+            default:
+                console.warn(`Unknown request type: ${type}`);
+        }
+    };
+
+    

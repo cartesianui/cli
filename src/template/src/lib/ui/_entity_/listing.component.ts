@@ -1,5 +1,5 @@
-import { Component, Injector, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
-import { ListingControlsComponent, ENTITY_CONSTRUCTOR } from '@cartesianui/common';
+import { Injector, ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
+import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType } from '@cartesianui/common';
 import { _Entity_Search } from '../../models';
 import { _Library_Sandbox } from '../../_library_.sandbox';
 import { _IEntity_, _Entity_ } from '../../models';
@@ -14,6 +14,7 @@ type _Entity_ChildComponent = typeof childComponents;
 @Component({
   selector: 'bo-_entity_-list',
   templateUrl: 'listing.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
     {
       provide: ENTITY_CONSTRUCTOR,
@@ -33,49 +34,58 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
   }
 
   ngOnInit(): void {
+    this.initTableColumnsAndHeaders();
     this.initCriteria(_Entity_Search);
     this.addSubscriptions();
   }
 
   protected addSubscriptions(): void {
     this.subscriptions.push(
-      this.sb._entityName_Meta$.subscribe((meta: any) => {
+      this.sb._entityName_.meta$.subscribe((meta: any) => {
         if (meta) {
           this.pagination = meta ? meta.pagination : null;
+        }
+      })
+    );
+
+    this.subscriptions.push(
+      this.sb._entityName_.getState$.subscribe((state) => {
+        this.handleBusyState(state);
+        if (state.completed) {
+          this.sb._entityName_.clearRequestState(RequestType.Get);
         }
       })
     );
   }
 
   protected list(): void {
-    this.startLoading();
-    this.sb.fetchAll_Entity_(this.criteria);
+    this.sb._entityName_.fetchAll(this.criteria);
   }
 
-  edit(entity: _Entity_): void {
-    this.sb.select_Entity_(entity);
-    this.showChildComponent(this.childComponents.editForm);
-  }
-
-  search() {
-    this.setPage(1);
-    if (this.searchText) {
-      this.criteria.where('name', 'like', this.searchText);
-    } else {
-      this.criteria.where('name', 'like', '');
-    } // TODO: Remove where
+  onSearch($event: { text: string }) {
+    this.criteria.page(1);
+    this.criteria.setSearchField('name', $event.text);
+    this.appendSearchCriteriaToUrl();
     this.list();
+  }
+
+  onDateChange($event: { start: string, end: string }) {
+    console.log($event);
+  }
+
+  onEdit(entity: _Entity_): void {
+    this.sb._entityName_.select(entity);
+    this.showChildComponent(this.childComponents.editForm, 'editForm');
   }
 
   onDelete() {
     if (this.selected.length > 0) {
-      // do deletion stuff
+       this.message.confirm('Are you sure you want to delete this record?', 'Confirm Deletion', (confirmed) => {
+        if (confirmed) {
+          this.sb._entityName_.delete(this.selected[0].id);
+          this.selected = [];
+        }
+    });
     }
   }
-
-  onCreated() {
-    this.list();
-    this.hideChildComponent(false);
-  }
-
 }

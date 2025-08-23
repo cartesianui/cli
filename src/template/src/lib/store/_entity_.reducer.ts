@@ -1,7 +1,7 @@
 
+import { createEntityFeature } from '@cartesianui/common';
 import { _Entity_ } from '../models';
 import { _Entity_Actions } from './_entity_.actions';
-import { createEntityFeature } from '@cartesianui/common';
 
 
 // Export via destructuring
@@ -17,8 +17,8 @@ import { createEntityFeature } from '@cartesianui/common';
 //   selected,
 //   meta,
 //   request,
-//   creation,
-//   updation,
+//   create,
+//   update,
 //   entities
 // } = createEntityFeature<_Entity_>('entities', _Entity_Actions);
 

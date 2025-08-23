@@ -1,11 +1,11 @@
 <default-actions
-  (save)="save()"
+  (save)="onSave()"
   [disabled]="{
     save: formGroup.invalid
   }"
 ></default-actions>
 
-<div class="animated fadeIn">
+<div class="animated fadeIn" #formContainer>
   <form novalidate autocomplete="off" [formGroup]="formGroup">
     <div class="row">
       <div class="col-md-12">
@@ -14,11 +14,26 @@
             <strong>Create _Entity_</strong>
           </div>
           <div class="card-body">
-            <div class="form-group">
-              <with-validation>
-                <label>Name</label>
-                <input validate formControlName="name" class="form-control" placeholder="Name" noWhiteSpace required/>
-              </with-validation>
+            <div class="row">
+              <!-- Left Column -->
+              <div class="col-md-6">
+                <div class="form-group">
+                  <with-validation>
+                    <label>Name</label>
+                    <input
+                      validate
+                      formControlName="name"
+                      class="form-control"
+                      placeholder="Name"
+                      noWhiteSpace
+                      required
+                    />
+                  </with-validation>
+                </div>
+              </div>
+
+              <!-- Right Column -->
+              <div class="col-md-6"></div>
             </div>
           </div>
         </div>
