@@ -8,7 +8,7 @@ import {
 } from "@angular/core";
 import { FormBaseComponent, RequestType } from "@cartesianui/common";
 import { _Library_Sandbox } from "../../../_library_.sandbox";
-import { _Entity_, _Entity_Search } from "../../../models";
+import { _Entity_ } from "../../../models";
 
 @Component({
   selector: "bo-edit-_entity_-form",

@@ -1,8 +1,8 @@
 import { createEntityActions } from '@cartesianui/common';
-import { _Entity_, _Entity_Search } from '../models';
+import { _Entity_ } from '../models';
 
 
-const actions = createEntityActions<_Entity_, _Entity_Search, '_Entity_'>('_Entity_');
+const actions = createEntityActions<_Entity_, '_Entity_'>('_Entity_');
 
 // Example of extending the actions with custom actions
 

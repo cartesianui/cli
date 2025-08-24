@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
+import { execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,12 +115,48 @@ function askConfirmation(message) {
   });
 }
 
+// async function getOverwritePermission() {
+//   logWarning(`This will add or update files in:\n → ${__destPath}`);
+
+//   const confirmed = await askConfirmation('Do you want to continue?');
+//   if (!confirmed) {
+//     logError('Operation cancelled.');
+//     process.exit(0);
+//   }
+// }
+
 async function getOverwritePermission() {
   logWarning(`This will add or update files in:\n → ${__destPath}`);
 
-  const confirmed = await askConfirmation('Do you want to continue?');
+  // Check if __destPath is a git repo
+  let isGitRepo = false;
+  try {
+    execSync("git rev-parse --is-inside-work-tree", {
+      cwd: __destPath,
+      stdio: "ignore",
+    });
+    isGitRepo = true;
+  } catch (err) {
+    isGitRepo = false;
+  }
+
+  if (isGitRepo) {
+    // Check if repo is clean
+    const status = execSync("git status --porcelain", { cwd: __destPath })
+      .toString()
+      .trim();
+
+    if (status !== "") {
+      logError("Git working directory is not clean.");
+      logError("Please commit or stash your changes, then run the command again.");
+      process.exit(1);
+    }
+  }
+
+  // Ask user confirmation
+  const confirmed = await askConfirmation("Do you want to continue?");
   if (!confirmed) {
-    logError('Operation cancelled.');
+    logError("Operation cancelled.");
     process.exit(0);
   }
 }
@@ -716,7 +753,7 @@ async function enhanceSandboxFileUsingMicroStub(targetFilePath, stubFile, entiti
     modelSet.add(`${pascalEntity}`);
     modelSet.add(`${pascalEntity}Search`);
     
-    stubDeftSet.add(replaceEntityPlaceHolders(`_entityName_: EntitySandbox<_Entity_, _Entity_Search>;`, entity));
+    stubDeftSet.add(replaceEntityPlaceHolders(`_entityName_: EntitySandbox<_Entity_>;`, entity));
     stubContentSet.add(replaceEntityPlaceHolders(stubContent, entity))
   }
 
@@ -920,6 +957,15 @@ function generateFormFields(fields: string[]): string {
   return `static override formFields: FieldDescriptor[] = [\n${lines}\n  ];\n`;
 }
 
+function generateSearchFormFields(fields: string[]): string {
+  const lines = fields
+  .map(
+    (f) => `   ${f}: { column: '${f}', operator: '=', value: null }`
+  ).join(',\n');
+
+  return `static override get searchForm() {\n   return {\n ${lines}\n }\n   };\n`;
+}
+
 async function enhanceModels(libraryName, entities) {
   
   const domainDir = path.join(__destPath, 'src', 'lib', 'models', 'domain');
@@ -947,12 +993,16 @@ async function enhanceModels(libraryName, entities) {
               logInfo(`<${interfaceName}> Generating formFields.`);
               const formFields = generateFormFields(fieldNames);
 
+              logInfo(`<${interfaceName}> Generating formFields.`);
+              const searchFormFields = generateSearchFormFields(fieldNames);
+
               // Output both
               // console.log('\n\n' + dataTableCols + '\n\n' + formFields + '\n');
 
               // Replace arrays in NgModule
               fileContent = fileContent.replace('/* LIST_VIEW_FIELDS */', dataTableCols);
               fileContent = fileContent.replace('/* FORM_FIELDS */', formFields);
+              fileContent = fileContent.replace('/* SEARCH_FORM */', searchFormFields);
 
               
               await fs.promises.writeFile(fullPath, fileContent, 'utf8');
@@ -1137,6 +1187,7 @@ namedFlags.forEach(flag => {
 const library = flagMap.lib;
 const entities = flagMap.entities?.split(',') || [];
 const dest = flagMap.dest || library || '';
+const force = flagMap.force || false;
 
 // ✅ Destination path (relative to where user runs the CLI)
 __destPath =  path.join(process.cwd(), dest);
@@ -1155,7 +1206,7 @@ switch (command) {
       case 'library':
           validateLibrary(command, subcommand, library);
           validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
+          if (force) await getOverwritePermission();
           generateLibrary(library, entities);
         break;
       
@@ -1173,7 +1224,7 @@ switch (command) {
     switch (subcommand) {
       case 'model':
           validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
+          if (force) await getOverwritePermission();
           enhanceModels(library, entities);
         break;
       
@@ -1190,7 +1241,7 @@ switch (command) {
     switch (subcommand) {
       case 'entity':
           validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
+          if (force) await getOverwritePermission();
           addEntity(library, entities)
         break;
       

@@ -13,7 +13,7 @@
     public _entityName_DeleteState$ = this.store.pipe(select(from_Entity_.delete));
     public _entityName_GetState$ = this.store.pipe(select(from_Entity_.get));
 
-    fetchAll_PEntity_ = (criteria: RequestCriteria<_Entity_Search>): void => {
+    fetchAll_PEntity_ = (criteria: RequestCriteria): void => {
         this.store.dispatch(_Entity_Actions.fetchAll({ criteria: criteria }));
     };
 

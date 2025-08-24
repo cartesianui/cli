@@ -6,7 +6,7 @@
   (searchChange)="onSearch($event)" 
   (dateRangeChange)="onDateChange($event)" 
   (create)="showChildComponent(childComponents.createForm, 'createForm')"
-  disabled]="{
+  [disabled]="{
     delete: selected.length !== 1
   }"
 ></page-actions>

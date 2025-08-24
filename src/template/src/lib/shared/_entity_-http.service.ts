@@ -1,17 +1,17 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { IHttpService, HttpService, POST, GET, Body, Criteria, DefaultHeaders, RequestCriteria, Path, DELETE, PATCH, PUT } from '@cartesianui/core';
-import { _Entity_, _Entity_Search } from '../models';
+import { _Entity_ } from '../models';
 
 @Injectable()
 @DefaultHeaders({
   Accept: 'application/json',
   'Content-Type': 'application/json'
 })
-export class _Entity_HttpService extends HttpService implements IHttpService<_Entity_, RequestCriteria<_Entity_Search>> {
+export class _Entity_HttpService extends HttpService implements IHttpService<_Entity_> {
 
   @GET('/_Pentity-name_')
-  public getAll(@Criteria criteria: RequestCriteria<_Entity_Search>): Observable<any> {
+  public getAll(@Criteria criteria: RequestCriteria): Observable<any> {
     return null;
   }
 

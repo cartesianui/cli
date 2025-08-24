@@ -3,7 +3,7 @@ import { Validators, ValidatorFn } from '@angular/forms';
 
 export interface _IEntity_ {
   id: string | undefined;
-  [prop: string]: any; // allow any other properties
+  field?: any; // allow any other properties
 }
 
 export class _Entity_ extends ParentModel implements _IEntity_ {
@@ -33,4 +33,13 @@ export class _Entity_ extends ParentModel implements _IEntity_ {
   //   { key: 'openedAt', label: 'Opened At', opt: { formatter: { type: 'date'} } },
   // ];
   /* FORM_FIELDS */
+
+
+  // static override get searchForm() {
+  //   return {
+  //     name: { column: 'name', operator: '=', value: null },
+  //     status: { column: 'status', operator: '=', value: null }
+  //   };
+  // }
+  /* SEARCH_FORM */
 }

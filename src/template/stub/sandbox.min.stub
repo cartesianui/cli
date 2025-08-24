@@ -1,5 +1,5 @@
 
-this._entityName_ = new EntitySandbox<_Entity_, _Entity_Search>(store, injector, {
+this._entityName_ = new EntitySandbox<_Entity_>(store, injector, {
     selectors: from_Entity_,
     actions: _Entity_Actions,
     model: _Entity_

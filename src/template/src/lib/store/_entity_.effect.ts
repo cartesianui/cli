@@ -3,12 +3,12 @@ import { Actions } from '@ngrx/effects';
 import { RequestCriteria } from '@cartesianui/core';
 import { BaseEntityEffects } from '@cartesianui/common';
 import { _Entity_Actions } from './_entity_.actions';
-import { _Entity_, _Entity_Search } from '../models';
+import { _Entity_ } from '../models';
 import { _Entity_HttpService } from '../shared';
 
 
 @Injectable()
-export class _Entity_Effects extends BaseEntityEffects<_Entity_, RequestCriteria<_Entity_Search>, typeof _Entity_Actions> {
+export class _Entity_Effects extends BaseEntityEffects<_Entity_> {
   constructor(
     actions$: Actions,
     httpService: _Entity_HttpService

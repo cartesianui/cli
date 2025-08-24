@@ -1,6 +1,5 @@
 import { Injector, ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
 import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType } from '@cartesianui/common';
-import { _Entity_Search } from '../../models';
 import { _Library_Sandbox } from '../../_library_.sandbox';
 import { _IEntity_, _Entity_ } from '../../models';
 
@@ -22,7 +21,7 @@ type _Entity_ChildComponent = typeof childComponents;
     }
   ]
 })
-export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_, _Entity_Search, _Entity_ChildComponent> implements OnInit, AfterViewInit, OnDestroy {
+export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_, _Entity_ChildComponent> implements OnInit, AfterViewInit, OnDestroy {
   override childComponents: _Entity_ChildComponent = childComponents;
 
   constructor(
@@ -34,8 +33,8 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
   }
 
   ngOnInit(): void {
-    this.initTableColumnsAndHeaders();
-    this.initCriteria(_Entity_Search);
+    this.loadEntityMetadata();
+    this.initCriteria();
     this.addSubscriptions();
   }
 
