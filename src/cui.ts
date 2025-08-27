@@ -705,7 +705,6 @@ async function enhanceSandboxFileUsingStub(targetFilePath, stubFile, entities, m
     storeSet.add(`${pascalEntity}Actions`);
 
     modelSet.add(`${pascalEntity}`);
-    modelSet.add(`${pascalEntity}Search`);
     
     let temp = replaceEntityPlaceHolders(stubContent, entity);
   
@@ -751,7 +750,7 @@ async function enhanceSandboxFileUsingMicroStub(targetFilePath, stubFile, entiti
     storeSet.add(`${pascalEntity}Actions`);
 
     modelSet.add(`${pascalEntity}`);
-    modelSet.add(`${pascalEntity}Search`);
+    // modelSet.add(`${pascalEntity}Search`);
     
     stubDeftSet.add(replaceEntityPlaceHolders(`_entityName_: EntitySandbox<_Entity_>;`, entity));
     stubContentSet.add(replaceEntityPlaceHolders(stubContent, entity))
@@ -1184,10 +1183,10 @@ namedFlags.forEach(flag => {
 });
 
 // Extract specific named args
-const library = flagMap.lib;
-const entities = flagMap.entities?.split(',') || [];
-const dest = flagMap.dest || library || '';
-const force = flagMap.force || false;
+const library = flagMap.lib || flagMap.l;
+const entities = flagMap.entities?.split(',') || flagMap.e?.split(',') || [];
+const dest = flagMap.dest || flagMap.d || library || '';
+const force = flagMap.force || flagMap.f || false;
 
 // ✅ Destination path (relative to where user runs the CLI)
 __destPath =  path.join(process.cwd(), dest);
