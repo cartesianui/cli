@@ -1,18 +1,10 @@
-import { Injectable, Injector } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { Sandbox, EntitySandbox } from '@cartesianui/common';
-
 
 @Injectable()
 export class _Library_Sandbox extends Sandbox {
 
-  constructor(
-    protected store: Store,
-    protected override injector: Injector
-  ) {
-    super(injector);
+  private store = inject(Store);
 
-  }
-
-  /* STUB_CONTENT */
 }

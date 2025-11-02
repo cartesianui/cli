@@ -1,4 +1,4 @@
 /*
- * Public API Surface of bo-_library_
+ * Public API Surface of admin-_library_
  */
 export * from './lib';

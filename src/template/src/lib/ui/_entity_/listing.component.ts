@@ -1,7 +1,10 @@
-import { Injector, ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
+import {ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy, effect, inject } from '@angular/core';
 import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType } from '@cartesianui/common';
 import { _Library_Sandbox } from '../../_library_.sandbox';
+import { LISTING_IMPORTS } from '../../_library_.imports';
 import { _IEntity_, _Entity_ } from '../../models';
+import { _Entity_CreateComponent } from './create/create.component';
+import { _Entity_EditComponent } from './edit/edit.component';
 
 const childComponents = {
   createForm: { id: 'create', title: 'Create _TEntity_' },
@@ -11,65 +14,41 @@ const childComponents = {
 type _Entity_ChildComponent = typeof childComponents;
 
 @Component({
-  selector: 'bo-_entity_-list',
-  templateUrl: 'listing.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [
-    {
-      provide: ENTITY_CONSTRUCTOR,
-      useValue: _Entity_
-    }
-  ]
+    selector: 'admin-_entity_-list',
+    templateUrl: 'listing.component.html',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [
+      ...LISTING_IMPORTS,
+      _Entity_CreateComponent,
+      _Entity_EditComponent
+    ],
+    providers: [
+      {
+        provide: ENTITY_CONSTRUCTOR,
+        useValue: _Entity_
+      }
+    ],
+    standalone: true
 })
 export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_, _Entity_ChildComponent> implements OnInit, AfterViewInit, OnDestroy {
   override childComponents: _Entity_ChildComponent = childComponents;
 
-  constructor(
-    injector: Injector,
-    public sb: _Library_Sandbox,
+  public sb = inject(_Library_Sandbox);
 
-  ) {
-    super(injector);
-  }
+  readonly _entityName_Effect = effect(() => {
+    this.handleBusyState(this.sb._entityName_.getState());
+    if (this.sb._entityName_.getCompleted()) {
+      this.sb._entityName_.clearRequestState(RequestType.Get);
+    }
+  });
 
   ngOnInit(): void {
     this.loadEntityMetadata();
     this.initCriteria();
-    this.addSubscriptions();
-  }
-
-  protected addSubscriptions(): void {
-    this.subscriptions.push(
-      this.sb._entityName_.meta$.subscribe((meta: any) => {
-        if (meta) {
-          this.pagination = meta ? meta.pagination : null;
-        }
-      })
-    );
-
-    this.subscriptions.push(
-      this.sb._entityName_.getState$.subscribe((state) => {
-        this.handleBusyState(state);
-        if (state.completed) {
-          this.sb._entityName_.clearRequestState(RequestType.Get);
-        }
-      })
-    );
   }
 
   protected list(): void {
-    this.sb._entityName_.fetchAll(this.criteria);
-  }
-
-  onSearch($event: { text: string }) {
-    this.criteria.page(1);
-    this.criteria.setSearchField('name', $event.text);
-    this.appendSearchCriteriaToUrl();
-    this.list();
-  }
-
-  onDateChange($event: { start: string, end: string }) {
-    console.log($event);
+    this.sb._entityName_.fetchAll(this.criteria.httpParams());
   }
 
   onEdit(entity: _Entity_): void {
@@ -86,5 +65,14 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
         }
     });
     }
+  }
+
+  onSearch($event: { text: string }) {
+    this.criteria.page(1);
+    this.criteria.updateForm('name', $event.text);
+  }
+
+  onDateChange($event: { start: string, end: string }) {
+    console.log($event);
   }
 }
