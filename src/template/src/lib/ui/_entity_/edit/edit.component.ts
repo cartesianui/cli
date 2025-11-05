@@ -7,9 +7,9 @@ import {
   effect,
   inject
 } from "@angular/core";
-import { FormBaseComponent, RequestType } from "@cartesianui/common";
+import { ENTITY_CONSTRUCTOR, FormBaseComponent, RequestType } from "@cartesianui/common";
 import { _Library_Sandbox } from "../../../_library_.sandbox";
-import { FORM_IMPORTS } from "../../../bookeeper.imports";
+import { FORM_IMPORTS } from "../../../_library_.imports";
 import { _Entity_ } from "../../../models";
 
 @Component({
@@ -17,9 +17,15 @@ import { _Entity_ } from "../../../models";
   templateUrl: "./edit.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-      ...FORM_IMPORTS
-    ],
-    standalone: true
+    ...FORM_IMPORTS
+  ],
+  providers: [
+    {
+      provide: ENTITY_CONSTRUCTOR,
+      useValue: _Entity_
+    }
+  ],
+  standalone: true
 })
 export class _Entity_EditComponent
   extends FormBaseComponent<_Entity_>
@@ -29,18 +35,23 @@ export class _Entity_EditComponent
 
   readonly _entityName_: Signal<_Entity_> = this.sb._entityName_.selected;
 
-  readonly selectedEffect = effect(() => {
-      if(this._entityName_()) {
-        this.formGroup = this.getFormFromEntity(this._entityName_());
-      }
+  // handle select state effect
+  private readonly selectEffect = effect(() => {
+    if (!this._entityName_()) return;
+    this.formGroup = this.getFormFromEntity(this._entityName_());
   });
 
-  readonly bussyEffect = effect(() => {
+  // handle busy state effect
+  private readonly busyEffect = effect(() => {
     this.handleFormBusyState(this.sb._entityName_.updateState());
-    if (this.sb._entityName_.updateCompleted()) {
-      this.notify.success("Successfully Updated", "Success");
-      this.sb._entityName_.clearRequestState(RequestType.Update);
-    }
+  });
+
+  // handle complete state effect
+  private readonly completeEffect = effect(() => {
+    if (!this.sb._entityName_.updateCompleted()) return;
+
+    this.notify.success("Successfully Updated", "Success");
+    this.sb._entityName_.clearRequestState(RequestType.Update);
   });
 
   constructor() {
@@ -49,9 +60,8 @@ export class _Entity_EditComponent
   }
 
   onSave(): void {
-    if (this.formGroup.valid) {
-      const updatedEntity = this.getEntityFromForm();
-      this.sb._entityName_.update(this._entityName_()?.id, updatedEntity);
-    }
+    if(!this.formGroup.valid) return;
+    const updatedEntity = this.getEntityFromForm();
+    this.sb._entityName_.update(this._entityName_()?.id, updatedEntity);
   }
 }

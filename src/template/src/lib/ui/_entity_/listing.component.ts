@@ -35,11 +35,15 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
 
   public sb = inject(_Library_Sandbox);
 
-  readonly _entityName_Effect = effect(() => {
+  // handle busy state effect
+  private readonly busyEffect = effect(() => {
     this.handleBusyState(this.sb._entityName_.getState());
-    if (this.sb._entityName_.getCompleted()) {
-      this.sb._entityName_.clearRequestState(RequestType.Get);
-    }
+  });
+
+  // handle complete state effect
+  private readonly completeEffect = effect(() => {
+    if (!this.sb._entityName_.getCompleted()) return;
+    this.sb._entityName_.clearRequestState(RequestType.Get);
   });
 
   ngOnInit(): void {

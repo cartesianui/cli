@@ -753,39 +753,58 @@ async function enhanceFormHtml(libraryName, entities) {
 // ---------------------        COOMON FILE FUNCTIONS             ------------------------------------------
 // ------------------------------------------------------------------------------------------------------------
 
-async function enhanceIndexFile(dirPath, key?) {
-  const exportSet = new Set();
-  
+export async function enhanceIndexFile(
+  dirPath: string,
+  options?: { key?: string; recursive?: boolean }
+) {
+  const key = options?.key;
+  const recursive = options?.recursive ?? false;
+
   const indexFilePath = path.join(dirPath, 'index.ts');
 
-  let content = '';
-  if (await fs.pathExists(indexFilePath)) {
-    content = await fs.readFile(indexFilePath, 'utf8');
-  }
+  let content = await fs.pathExists(indexFilePath)
+    ? await fs.readFile(indexFilePath, 'utf8')
+    : '';
 
-  const files = await fs.readdir(dirPath);
+  const filesToExport: string[] = [];
 
-  for (const file of files) {
-    const fullPath = path.join(dirPath, file);
-    const stat = await fs.stat(fullPath);
+  async function scan(currentDir: string) {
+    const files = await fs.readdir(currentDir);
 
-    if (stat.isFile() && file !== 'index.ts') {
-      const isMatch = key ? file.endsWith(`.${key}.ts`) : true;
-      if (isMatch) {
-        const baseName = path.basename(file, '.ts');
-        const exportLine = `export * from './${baseName}';`;
-        if (!content.includes(exportLine)) {
-          exportSet.add(exportLine);
+    for (const file of files) {
+      const fullPath = path.join(currentDir, file);
+      const stat = await fs.stat(fullPath);
+
+      if (stat.isDirectory()) {
+        if (recursive) {
+          await scan(fullPath);
         }
+        continue;
+      }
+
+      if (stat.isFile() && file !== 'index.ts') {
+        const isMatch = key ? file.endsWith(`.${key}.ts`) : true;
+        if (isMatch) filesToExport.push(fullPath);
       }
     }
   }
 
-  const exportSection = Array.from(exportSet).join('\n');
+  // scan dirs
+  await scan(dirPath);
 
-  content = `${content}\n\n${exportSection}`;
-  await fs.writeFile(indexFilePath, content, 'utf8');
+  const exportLinesToAppend = filesToExport
+    .map(f => {
+      const rel = './' + path.relative(dirPath, f).replace(/\\/g, '/').replace('.ts', '');
+      return `export * from '${rel}';`;
+    })
+    .filter(l => !content.includes(l));  // avoid duplicates
+
+  if (exportLinesToAppend.length) {
+    content += '\n\n' + exportLinesToAppend.join('\n');
+    await fs.writeFile(indexFilePath, content, 'utf8');
+  }
 }
+
 
 //==========================================================================================
 //                         Add New Entity
@@ -808,19 +827,19 @@ async function copyEntityToLibrary(templateSrc, destSrc, entityName) {
 
   logInfo('Updating domain model export file content.');
   const domainModelDir = path.join(libPath, 'models', 'domain');
-  await enhanceIndexFile(domainModelDir, 'model');
+  await enhanceIndexFile(domainModelDir, { key: 'model' });
 
   logInfo('Updating form model export file content.');
   const searchModelDir = path.join(libPath, 'models', 'forms');
-  await enhanceIndexFile(searchModelDir, 'search');
+  await enhanceIndexFile(searchModelDir, { key: 'search' });
   
   logInfo('Updating shared export file content.');
   const sharedDir = path.join(libPath, 'shared');
-  await enhanceIndexFile(sharedDir);
+  await enhanceIndexFile(sharedDir, { recursive: true });
 
   logInfo('Updating store export file content.');
   const storeDir = path.join(libPath, 'store');
-  await enhanceIndexFile(storeDir);
+  await enhanceIndexFile(storeDir, { recursive: true });
 
   function walkAndCopy(srcDir, targetDir) {
     const entries = fs.readdirSync(srcDir, { withFileTypes: true });
@@ -915,19 +934,19 @@ async function generateLibrary(libraryName, entities) {
 
     logInfo('Generating domain model export file content.');
     const domainModelDir = path.join(libPath, 'models', 'domain');
-    await enhanceIndexFile(domainModelDir, 'model');
+    await enhanceIndexFile(domainModelDir, { key: 'model' });
 
     logInfo('Generating form model export file content.');
     const searchModelDir = path.join(libPath, 'models', 'forms');
-    await enhanceIndexFile(searchModelDir, 'search');
+    await enhanceIndexFile(searchModelDir, { key: 'search' });
     
     logInfo('Generating shared export file content.');
     const sharedDir = path.join(libPath, 'shared');
-    await enhanceIndexFile(sharedDir);
+    await enhanceIndexFile(sharedDir, { recursive: true });
 
     logInfo('Generating store export file content.');
     const storeDir = path.join(libPath, 'store');
-    await enhanceIndexFile(storeDir);
+    await enhanceIndexFile(storeDir, { recursive: true });
     
     logInfo('Generating providers file content.');
     const providersFilePath = path.join(libPath, `${libraryName}.providers.ts`);
@@ -1178,6 +1197,7 @@ __tplPath = flagMap.tpl || path.join(__dirname, 'template');
 validateCommand(command);
 switch (command) {
   case 'generate':
+  case 'create':
     validateSubCommand(command, subcommand, ['library']);
     validateLibrary(command, subcommand, library);    
     switch (subcommand) {

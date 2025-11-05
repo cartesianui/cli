@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
 import { Actions } from '@ngrx/effects';
 import { EntityEffect } from '@cartesianui/common';
-import { _Entity_Actions } from './_entity_.actions';
-import { _Entity_ } from '../models';
-import { _Entity_HttpService } from '../shared';
+import { _Entity_Actions } from './actions';
+import { _Entity_ } from '../../models';
+import { _Entity_HttpService } from '../../shared';
 
 
 @Injectable()

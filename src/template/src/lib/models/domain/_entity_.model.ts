@@ -1,4 +1,4 @@
-import { ParentModel, FieldDescriptor, DateFormat } from '@cartesianui/common';
+import { BaseModel, FieldDescriptor, DateFormat } from '@cartesianui/common';
 import { Validators, ValidatorFn } from '@angular/forms';
 
 export interface _IEntity_ {
@@ -6,7 +6,7 @@ export interface _IEntity_ {
   field?: any; // allow any other properties
 }
 
-export class _Entity_ extends ParentModel implements _IEntity_ {
+export class _Entity_ extends BaseModel implements _IEntity_ {
   public id: string;
   public field?: string;
 
