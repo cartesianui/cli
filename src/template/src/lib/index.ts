@@ -11,3 +11,4 @@
 // export * from './ui/_entity_/edit/edit.component';
 export * from './entry.component';
 export * from './_library_.sandbox';
+export * from './_library_.routes';

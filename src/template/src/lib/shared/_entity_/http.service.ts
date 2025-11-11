@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { IHttpService, HttpService, POST, GET, Body, Criteria, DefaultHeaders, RequestCriteriaOuput, Path, DELETE, PATCH, PUT } from '@cartesianui/core';
-import { _Entity_ } from '../models';
+import { _Entity_ } from '../../models';
 
 @Injectable()
 @DefaultHeaders({
