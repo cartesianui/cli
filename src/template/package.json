@@ -1,13 +1,12 @@
 {
-  "name": "@cartesianui/admin-_library_",
+  "name": "@cartesianui/_section_-_library_",
   "version": "0.0.0",
   "peerDependencies": {
     "@angular/common": "^20.3.2",
     "@angular/core": "^20.3.2",
     "@angular/forms": "^20.3.2",
     "@cartesianui/core": "^2.0.0",
-    "@cartesianui/common": "^1.0.0",
-    "@cartesianui/admin-auth": "^1.0.0"
+    "@cartesianui/common": "^1.0.0"
   },
   "dependencies": {
     "tslib": "^2.4.0"

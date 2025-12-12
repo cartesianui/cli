@@ -14,7 +14,7 @@ const childComponents = {
 type _Entity_ChildComponent = typeof childComponents;
 
 @Component({
-    selector: 'admin-_entity_-list',
+    selector: '_section_-_entity_-list',
     templateUrl: 'listing.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [

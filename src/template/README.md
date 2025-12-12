@@ -1,23 +1,23 @@
-# Back-Office _Library_
+# _Section_ App _Library_ Library
 
 This library was generated with [Angular CLI](https://github.com/angular/angular-cli) version 12.2.0.
 
 ## Code scaffolding
 
-Run `ng generate component component-name --project admin-_library_` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module --project admin-_library_`.
-> Note: Don't forget to add `--project admin-_library_` or else it will be added to the default project in your `angular.json` file. 
+Run `ng generate component component-name --project _section_-_library_` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module --project _section_-_library_`.
+> Note: Don't forget to add `--project _section_-_library_` or else it will be added to the default project in your `angular.json` file. 
 
 ## Build
 
-Run `ng build admin-_library_` to build the project. The build artifacts will be stored in the `dist/` directory.
+Run `ng build _section_-_library_` to build the project. The build artifacts will be stored in the `dist/` directory.
 
 ## Publishing
 
-After building your library with `ng build admin-_library_`, go to the dist folder `cd dist/admin-_library_` and run `npm publish`.
+After building your library with `ng build _section_-_library_`, go to the dist folder `cd dist/_section_/_library_` and run `npm publish`.
 
 ## Running unit tests
 
-Run `ng test admin-_library_` to execute the unit tests via [Karma](https://karma-runner.github.io).
+Run `ng test _section_-_library_` to execute the unit tests via [Karma](https://karma-runner.github.io).
 
 ## Linting
 
@@ -28,7 +28,7 @@ Run `ng test admin-_library_` to execute the unit tests via [Karma](https://karm
 
 2. Run lint command as
 
-`ng lint --project=admin-_library_`
+`ng lint --project=_section_-_library_`
 
 ## Further help
 

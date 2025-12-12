@@ -16,19 +16,19 @@
   [visible]="childSelected"
   (visibleChange)="hideChildComponent($event)"
 >
-  <admin-create-_entity_-form
+  <_section_-create-_entity_-form
      *ngIf="selectedChildKey === 'createForm'"
     (created)="onCreated()"
-  ></admin-create-_entity_-form>
-  <admin-edit-_entity_-form
+  ></_section_-create-_entity_-form>
+  <_section_-edit-_entity_-form
      *ngIf="selectedChildKey === 'editForm'"
-  ></admin-edit-_entity_-form>
+  ></_section_-edit-_entity_-form>
 </app-offcanvas>
 
-<div class="animated fadeIn dt" #dtContainer>
+<div class="main-content dt" #dtContainer>
   <div class="row">
     <div class="col-md-12 my-2">
-      <span class="float-end">Total: {{ pagination.total }}</span>
+      <span class="float-end">Total: {{ sb._entityName_.pagination()?.total }}</span>
     </div>
   </div>
   <div class="card">

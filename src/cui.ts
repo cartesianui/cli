@@ -945,7 +945,7 @@ async function copyEntityToLibrary(templateSrc, destSrc, entityName) {
   }
 }
 
-async function addEntity(library, entities) {
+async function addEntity(section, library, entities) {
   
   const templateSrc = path.join(__tplPath, 'src');
   const destSrc = path.join(__destPath, 'src');
@@ -958,6 +958,9 @@ async function addEntity(library, entities) {
     copyEntityToLibrary(templateSrc, destSrc, entityName);
   }
   
+  // Replace any section place holders
+  await replaceSectionPlaceholders(__destPath, section);
+
   // Replace any library place holders
   await replaceLibraryPlaceholders(destSrc, library);
 
@@ -982,11 +985,13 @@ async function addEntity(library, entities) {
 //                         Generate Library
 //==========================================================================================
 
-async function generateLibrary(libraryName, entities) {
+async function generateLibrary(sectionName, libraryName, entities) {
   logInfo(`Generating library: ${libraryName}`);
   try {
     await copyTemplateContents(__tplPath, __destPath);
     logInfo(`Copied template to ${__destPath}`);
+
+    await replaceSectionPlaceholders(__destPath, sectionName);
 
     await replaceLibraryPlaceholders(__destPath, libraryName);
 
@@ -1188,6 +1193,34 @@ async function replaceLibraryPlaceholders(destPath, libraryName) {
   await walk(destPath);
 }
 
+async function replaceSectionPlaceholders(destPath, sectionName) {
+  const pascalName = pascalCase(sectionName);
+
+  const walk = async (dir) => {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      // Skip the .git folder
+      if (entry.name === ".git") {
+        continue;
+      }
+
+      const filePath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        await walk(filePath);
+      } else {
+        let content = await fs.readFile(filePath, 'utf8');
+        content = content
+          .replace(/_section_/g, sectionName)
+          .replace(/_Section_/g, pascalName);
+        await fs.writeFile(filePath, content, 'utf8');
+      }
+    }
+  };
+
+  await walk(destPath);
+}
 
 //==========================================================================================
 //                              Print Directory Structure
@@ -1253,6 +1286,7 @@ namedFlags.forEach(flag => {
 });
 
 // Extract specific named args
+const section = flagMap.section || flagMap.s || 'admin';
 const library = flagMap.lib || flagMap.l;
 const entities = flagMap.entities?.split(',') || flagMap.e?.split(',') || [];
 const dest = flagMap.dest || flagMap.d || library || '';
@@ -1277,7 +1311,7 @@ switch (command) {
           validateLibrary(command, subcommand, library);
           validateEntities(command, subcommand, library, entities);
           if (force) await getOverwritePermission();
-          generateLibrary(library, entities);
+          generateLibrary(section, library, entities);
         break;
       
       default:
@@ -1318,7 +1352,7 @@ switch (command) {
       case 'entity':
           validateEntities(command, subcommand, library, entities);
           if (force) await getOverwritePermission();
-          addEntity(library, entities)
+          addEntity(section, library, entities)
         break;
       
       default:

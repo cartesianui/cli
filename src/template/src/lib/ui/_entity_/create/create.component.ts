@@ -5,7 +5,7 @@ import { FORM_IMPORTS } from '../../../_library_.imports';
 import { _Entity_ } from '../../../models';
 
 @Component({
-  selector: 'admin-create-_entity_-form',
+  selector: '_section_-create-_entity_-form',
   templateUrl: './create.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

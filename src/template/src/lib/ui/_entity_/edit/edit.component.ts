@@ -13,7 +13,7 @@ import { FORM_IMPORTS } from "../../../_library_.imports";
 import { _Entity_ } from "../../../models";
 
 @Component({
-  selector: "admin-edit-_entity_-form",
+  selector: "_section_-edit-_entity_-form",
   templateUrl: "./edit.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
