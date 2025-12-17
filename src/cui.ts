@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
+import { execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,12 +115,48 @@ function askConfirmation(message) {
   });
 }
 
+// async function getOverwritePermission() {
+//   logWarning(`This will add or update files in:\n → ${__destPath}`);
+
+//   const confirmed = await askConfirmation('Do you want to continue?');
+//   if (!confirmed) {
+//     logError('Operation cancelled.');
+//     process.exit(0);
+//   }
+// }
+
 async function getOverwritePermission() {
   logWarning(`This will add or update files in:\n → ${__destPath}`);
 
-  const confirmed = await askConfirmation('Do you want to continue?');
+  // Check if __destPath is a git repo
+  let isGitRepo = false;
+  try {
+    execSync("git rev-parse --is-inside-work-tree", {
+      cwd: __destPath,
+      stdio: "ignore",
+    });
+    isGitRepo = true;
+  } catch (err) {
+    isGitRepo = false;
+  }
+
+  if (isGitRepo) {
+    // Check if repo is clean
+    const status = execSync("git status --porcelain", { cwd: __destPath })
+      .toString()
+      .trim();
+
+    if (status !== "") {
+      logError("Git working directory is not clean.");
+      logError("Please commit or stash your changes, then run the command again.");
+      process.exit(1);
+    }
+  }
+
+  // Ask user confirmation
+  const confirmed = await askConfirmation("Do you want to continue?");
   if (!confirmed) {
-    logError('Operation cancelled.');
+    logError("Operation cancelled.");
     process.exit(0);
   }
 }
@@ -178,79 +215,12 @@ function pluralize(name: string): string {
   }
 }
 
-function smartSplit(str) {
-  const result = [];
-  let current = '';
-  let depthRound = 0; // ()
-  let depthSquare = 0; // []
-  let depthCurly = 0; // {}
-
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
-
-    if (char === ',' && depthRound === 0 && depthSquare === 0 && depthCurly === 0) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-
-      if (char === '(') depthRound++;
-      if (char === ')') depthRound--;
-      if (char === '[') depthSquare++;
-      if (char === ']') depthSquare--;
-      if (char === '{') depthCurly++;
-      if (char === '}') depthCurly--;
-    }
-  }
-
-  if (current.trim()) result.push(current.trim());
-  return result;
+function insertAtClassEnd(classContent: string, appendContent: string): string {
+  // Find the last closing curly brace and insert content before it
+  return classContent.replace(/}\s*$/, `  ${appendContent}\n}`);
 }
 
-function insertStubContentBeforeMarker(content: string, stubBlock: string): string {
-  const marker = '/* STUB_CONTENT */';
-  const index = content.indexOf(marker);
-  if (index === -1) return content;
-
-  const before = content.slice(0, index);
-  const after = content.slice(index);
-
-  // Add a newline if needed
-  const insert = (before.endsWith('\n') ? '' : '\n') + stubBlock + '\n';
-
-  return before + insert + after;
-}
-
-function insertStubSection(fileContent: string, stubContent: string, mode = 'new'): string {
-  const stubMarker = '/* STUB_CONTENT */';
-
-  const index = fileContent.indexOf(stubMarker);
-
-  if (index === -1) {
-    throw new Error('Stub marker not found.');
-  }
-
-  // Determine the indentation level of the stub line
-  const lines = fileContent.split('\n');
-  const stubLine = lines.find(line => line.includes(stubMarker)) || '';
-  const indentMatch = stubLine.match(/^(\s*)/);
-  const indent = indentMatch ? indentMatch[1] : '';
-
-  // Indent the stub content to match
-  const indentedStubContent = stubContent
-    .split('\n')
-    .map(line => (line.trim() ? indent + line : '')) // maintain empty lines
-    .join('\n');
-
-  return fileContent.replace(stubMarker, `${indentedStubContent}\n${indent}${stubMarker}`);
-}
-
-function insertStubRoutes(
-  content: string,
-  stubRouteSet,
-  mode = 'append',
-  commaPerLine = false
-): string {
+function insertStubRoutes(content: string, stubRouteSet, mode = 'append', commaPerLine = false): string {
   const lines = content.split('\n');
   const stubIndex = lines.findIndex(line => line.includes('/* STUB_CONTENT */'));
   if (stubIndex === -1) return content;
@@ -289,70 +259,19 @@ function insertStubRoutes(
   return lines.join('\n');
 }
 
-// function insertStubRoutes(content, stubRouteSet, mode = 'append') {
-//   const lines = content.split('\n');
-//   const stubIndex = lines.findIndex(line => line.includes('/* STUB_CONTENT */'));
-//   if (stubIndex === -1) return content;
+function insertImportSectionBeforeFirstExportFunc(content: string, importSection: string) {
+  return content.replace(/(?=^export function)/m, `${importSection}\n\n`);
+}
 
-//   // Find the previous non-empty line (route)
-//   let lastRouteIndex = stubIndex - 1;
-//   while (lastRouteIndex >= 0 && lines[lastRouteIndex].trim() === '') {
-//     lastRouteIndex--;
-//   }
+function insertImportSectionBeforeFirstExportConst(content: string, importSection: string) {
+  return content.replace(
+    /^(?=export\s+const\s+)/m,
+    `${importSection}\n\n`
+  );
+}
 
-//   // Only add a comma to the last route if needed (and not in 'new' mode)
-//   if (mode !== 'new' && lastRouteIndex >= 0) {
-//     const lastLine = lines[lastRouteIndex];
-//     if (!lastLine.trim().endsWith(',')) {
-//       lines[lastRouteIndex] = lastLine.replace(/\s*$/, ','); // add comma at the end
-//     }
-//   }
-
-//   // Get indentation from the stub comment line
-//   const indentMatch = lines[stubIndex].match(/^(\s*)/);
-//   const indent = indentMatch ? indentMatch[1] : '  ';
-
-//   // Ensure each route is added as a proper line
-//   const stubLines = Array.from(stubRouteSet as Set<string>)
-//     .map(route => route.trim())
-//     .filter(route => !!route)
-//     .map(route => `${indent}${route}`);
-
-//   // Insert stub lines before the STUB_CONTENT marker
-//   lines.splice(stubIndex, 0, ...stubLines);
-
-//   return lines.join('\n');
-// }
-
-//==========================================================================================
-//                                    Generate Library
-//==========================================================================================
-
-function findEntityTemplates(dir) {
-  const result = [];
-
-  const walk = (currentPath) => {
-    const items = fs.readdirSync(currentPath, { withFileTypes: true });
-
-    for (const item of items) {
-      const fullPath = path.join(currentPath, item.name);
-
-      if (
-        item.name.includes('_entity_')
-         || item.name.includes('_Entity_')
-         //|| item.name.includes('entity-endpoint')
-      ) {
-        result.push(fullPath);
-      }
-
-      if (item.isDirectory()) {
-        walk(fullPath);
-      }
-    }
-  };
-
-  walk(dir);
-  return result;
+function formatMultiLineImport(identifiers, source) {
+  return `import {\n  ${Array.from(identifiers).join(',\n  ')}\n} from '${source}';`;
 }
 
 function replaceEntityPlaceHolders(content, entity) {
@@ -387,6 +306,779 @@ function replaceEntityPlaceHolders(content, entity) {
   return content;
 }
 
+// ------------------------------------------------------------------------------------------------------------
+// ---------------------        PROVIDERS FILE FUNCTIONS             ------------------------------------------
+// ------------------------------------------------------------------------------------------------------------
+function injectIntoImportProvidersFrom(content: string, innerLines: string[]) {
+  return content.replace(
+    /(importProvidersFrom\s*\([\s\S]*?)(\n\s*\)\s*,)/m,
+    (_, start, end) => {
+      const indent = (start.match(/(\n\s*)[^\n]*$/)?.[1] ?? '\n      ');
+      const injected = innerLines.map(line => `${indent}${line},`).join('');
+      return `${start}${injected}${end}`;
+    }
+  );
+}
+
+export function appendSharedProvidersAtEnd(
+  content: string,
+  providers: string[]
+): string {
+  if (!providers.length) return content;
+
+  return content.replace(
+    /makeEnvironmentProviders\(\s*\[((?:\[[^\]]*\]|[^\]])*)\]\s*\)/gm,
+    (m, inside) => {
+      const lines = inside.split('\n');
+
+      // find last non-empty real item line
+      let i = lines.length - 1;
+      while (i >= 0 && !lines[i].trim()) i--;
+
+      // add comma if last real element has no comma
+      if (i >= 0 && !lines[i].trim().endsWith(',')) {
+        lines[i] = lines[i] + ',';
+      }
+
+      // get indentation from last line OR at least 2 spaces
+      const indent = lines[i]?.match(/^\s*/)?.[0] ?? '  ';
+
+      // append
+      for (const p of providers) {
+        lines.push(`${indent}${p},`);
+      }
+
+      // return without touching ANYTHING else
+      return `makeEnvironmentProviders([${lines.join('\n')}])`;
+    }
+  );
+}
+
+function cleanupMakeEnvironmentProvidersFormatting(content: string) {
+
+  // remove comma right after [
+  content = content.replace(/\[\s*,/g, '[');
+
+  // ensure space after comma before ]
+  content = content.replace(/,\s*\]/g, ', ]');
+
+  // ensure there is newline after top-level [
+  content = content.replace(
+    /(makeEnvironmentProviders\(\s*\[)(\S)/gm,
+    (_m, a, b) => `${a}\n  ${b}`
+  );
+
+  // ensure newline before top-level ])
+  content = content.replace(
+    /(\S)(\]\s*\))/gm,
+    (_m, a, b) => `${a}\n${b}`
+  );
+
+  // trim and indent top-level providers block
+  content = content.replace(
+    /makeEnvironmentProviders\(\s*\[((?:\[[^\]]*\]|[^\]])*)\]\s*\)/gms,
+    (m, inside) => {
+      const lines = inside
+        .split('\n')
+        .map(x => x.trimEnd())
+        .filter((x, i) => !(i === 0 && x.trim() === '')) // remove empty first line
+        .map(l => '  ' + l); // indent 2 spaces
+
+      return `makeEnvironmentProviders([\n${lines.join('\n')}\n])`;
+    }
+  );
+
+  // collapse multi-line EffectsModule.forFeature([...]) arrays to single line
+  content = content.replace(
+    /EffectsModule\.forFeature\(\[\s*([\s\S]*?)\s*\]\)/gm,
+    (_m, inner) => {
+      const trimmed = inner
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l) // remove empty lines
+        .join(', '); // join with comma + space
+      return `EffectsModule.forFeature([${trimmed}])`;
+    }
+  );
+
+  return content;
+}
+
+// content: string,
+// importSection: string,                 // e.g. `import { Foo } from 'x';`
+// storeEffectSet: string[],              // e.g. ['UsersEffects','OrdersEffects']
+// storeFeatureSet: string[],             // e.g. ['StoreModule.forFeature(usersFeature)']
+// httpServiceSet: string[]               // e.g. ['provideUserApi()', 'provideOrderApi()']
+export function transformProviders(
+  content: string, importSection: string, storeEffectSet: string[], storeFeatureSet: string[], sharedSet: string[]): string {
+
+  content = insertImportSectionBeforeFirstExportFunc(content, importSection);
+
+  content = injectIntoImportProvidersFrom(content, [
+    ...storeFeatureSet,
+    storeEffectSet.length
+      ? `EffectsModule.forFeature([${storeEffectSet.join(', ')}])`
+      : ''
+  ].filter(Boolean));
+
+  content = appendSharedProvidersAtEnd(content, sharedSet);
+
+  content = cleanupMakeEnvironmentProvidersFormatting(content);
+
+  return content;
+}
+
+async function enhanceProviderFileWithEntities(moduleFilePath, entities) {
+  let content = await fs.readFile(moduleFilePath, 'utf8');
+
+  const importStatementSet = new Set();
+  const importStoreSet = new Set();
+  const importSharedSet = new Set();
+  
+  const storeEffectSet =  [];
+  const storeFeatureSet =  [];
+  const httpServiceSet = new Set();
+
+
+  // const provideFromProvidersSet = new Set();
+  // const providersSet = new Set();
+
+  for (const entity of entities) {
+    const pascalEntity = pascalCase(entity);
+    const kebabEntity = kebabCase(entity);
+
+    // for import statements
+    const storeFeature = `from${pascalEntity}`;
+    importStoreSet.add(storeFeature);
+    importStoreSet.add(`${pascalEntity}Effects `);
+    importSharedSet.add(`${pascalEntity}HttpService`);
+
+    // to use in providers
+    httpServiceSet.add(`${pascalEntity}HttpService`);
+    storeEffectSet.push(`${pascalEntity}Effects`);
+    storeFeatureSet.push(`StoreModule.forFeature(${storeFeature}.featureKey, ${storeFeature}.reducer)`);
+  }
+
+  const storeImports = formatMultiLineImport(importStoreSet, './store');
+  importStatementSet.add(storeImports);
+
+  const sharedImports = formatMultiLineImport(importSharedSet, './shared');
+  importStatementSet.add(sharedImports);
+
+  const combinedImportStatementSet = new Set([
+    ...importStatementSet,
+    // ...componentImportSet
+  ]);
+
+  // Inject imports before @NgModule
+  const importSection = Array.from(combinedImportStatementSet).join('\n');
+
+  const sharedSet = Array.from(httpServiceSet) as string[];
+
+  content = transformProviders(content, importSection, storeEffectSet, storeFeatureSet, sharedSet)
+
+  await fs.writeFile(moduleFilePath, content, 'utf8');
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// ---------------------        SANDBOX FILE  FUNCTIONS              ------------------------------------------
+// ------------------------------------------------------------------------------------------------------------
+
+async function enhanceSandboxFileUsingMicroStub(targetFilePath, stubFile, entities, mode = 'new') {
+
+  let content = await fs.readFile(targetFilePath, 'utf8');
+  let stubContent = await fs.readFile(stubFile, 'utf8');
+
+  const importSet = new Set();
+  const stubContentSet = new Set();
+
+  const storeSet = new Set();
+  const modelSet = new Set();
+
+  for (const entity of entities) {
+    const pascalEntity = pascalCase(entity);
+
+    storeSet.add(`from${pascalEntity}`);
+    storeSet.add(`${pascalEntity}Actions`);
+
+    modelSet.add(`${pascalEntity}`);
+    
+    stubContentSet.add(replaceEntityPlaceHolders(stubContent, entity))
+  }
+
+  const storeImport = formatMultiLineImport(storeSet, './store');
+  const modelImport = formatMultiLineImport(modelSet, './models');
+
+  importSet.add(storeImport);
+  importSet.add(modelImport);
+
+  // Inject imports before @Injectable()
+  const importSection = Array.from(importSet).join('\n');
+  content = content.replace(/(@Injectable())/, `${importSection}\n\n$1`);
+
+  const stubSection = Array.from(stubContentSet).join('\n\n\n');
+
+  content = insertAtClassEnd(content, stubSection.trim());
+
+  await fs.writeFile(targetFilePath, content, 'utf8');
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// ---------------------        ROUTES FILE FUNCTIONS                ------------------------------------------
+// ------------------------------------------------------------------------------------------------------------
+async function enhanceRoutingFileUsingStub(targetFilePath, stubFile, entities, mode='new') {
+
+  let content = await fs.readFile(targetFilePath, 'utf8');
+  let stubContent = await fs.readFile(stubFile, 'utf8');
+
+  const importSet = new Set();
+  const componentImportSet = new Set();
+  const stubContentSet = new Set();
+
+  for (const entity of entities) {
+    const pascalEntity = pascalCase(entity);
+    const kebabEntity = kebabCase(entity);
+
+    const listingComponent = `${pascalEntity}ListingComponent`;
+    const listingImport = `import { ${listingComponent} } from './ui/${kebabEntity}/listing.component';`;
+    componentImportSet.add(listingImport);
+    
+    let temp = replaceEntityPlaceHolders(stubContent, entity);
+
+    stubContentSet.add(temp);;
+  }
+
+  const combinedImportSet = new Set([
+    ...importSet,
+    ...componentImportSet
+  ]);
+
+  // Inject imports before route declaration 
+  const importSection = Array.from(combinedImportSet).join('\n');
+
+  content = insertImportSectionBeforeFirstExportConst(content, importSection);
+
+  content = insertStubRoutes(content, stubContentSet, mode, true);
+
+  await fs.writeFile(targetFilePath, content, 'utf8');
+}
+
+//==========================================================================================
+//                         Enhance Models  (Add Form & Datatable Fields)
+//==========================================================================================
+
+function getInterfaceNameFromFileName(fileName: string): string {
+  // Remove extension
+  const baseName = fileName.replace(/\.model\.ts$/, '');
+  
+  // Convert kebab-case or snake_case to PascalCase
+  const pascalCase = baseName
+    .split(/[-_]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+
+  return `I${pascalCase}`;
+}
+
+function parseInterface(content, interfaceName) {
+  const regex = new RegExp(`export interface ${interfaceName} {([\\s\\S]*?)}`, 'm');
+  const match = content.match(regex);
+
+  if (!match) {
+    //throw new Error(`Interface ${interfaceName} not found`);
+    logError(`Interface ${interfaceName} not found`);
+    return false;
+  } else {
+    const fieldsBlock = match[1];
+    const fieldLines = fieldsBlock
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => line.includes(':'));
+
+    const fieldNames = fieldLines.map((line) => {
+        const [key] = line.split(':');
+        return key.replace(/[?]/g, '').trim();
+    });
+
+    return fieldNames;
+  }
+  
+}
+
+function generateDataTableCols(fields: string[]): string {
+  const lines = fields.map(
+    (f) => `    { key: '${f}', label: '${readableCase(f)}', opt: {} }`
+  ).join(',\n');
+
+  return `static override get dataTableCols(): FieldDescriptor[] {\n  return [\n${lines}\n  ];\n}\n`;
+}
+
+function generateFormFields(fields: string[]): string {
+  const lines = fields
+  .filter(f => f.trim().toLowerCase() !== 'id')
+  .map(
+    (f) => `    { key: '${f}', label: '${readableCase(f)}', opt: { validators: [Validators.required] } }`
+  ).join(',\n');
+
+  return `static override formFields: FieldDescriptor[] = [\n${lines}\n  ];\n`;
+}
+
+function generateSearchFormFields(fields: string[]): string {
+  const lines = fields
+  .map(
+    (f) => `   ${f}: { column: '${f}', operator: '=', value: null }`
+  ).join(',\n');
+
+  return `static override get searchForm() {\n   return {\n ${lines}\n }\n   };\n`;
+}
+
+async function enhanceModels(libraryName, entities) {
+  
+  const domainDir = path.join(__destPath, 'src', 'lib', 'models', 'domain');
+
+  const files = await fs.promises.readdir(domainDir);
+
+  const entityFiles = entities.map(e => `${kebabCase(e)}.model.ts`);
+
+  for (const file of files) {
+    if(entityFiles.includes(file)){
+      const fullPath = path.join(domainDir, file);
+      const stat = await fs.promises.stat(fullPath);
+
+      if (stat.isFile() && file !== 'index.ts') { 
+          let fileContent = await fs.promises.readFile(fullPath, 'utf8');
+
+          const interfaceName = getInterfaceNameFromFileName(file);
+          
+          const fieldNames = parseInterface(fileContent, interfaceName);
+
+          if(fieldNames) {
+              logInfo(`<${interfaceName}> Generating dataTableCols.`);
+              const dataTableCols = generateDataTableCols(fieldNames);
+
+              logInfo(`<${interfaceName}> Generating formFields.`);
+              const formFields = generateFormFields(fieldNames);
+
+              logInfo(`<${interfaceName}> Generating formFields.`);
+              const searchFormFields = generateSearchFormFields(fieldNames);
+
+              // Output both
+              // console.log('\n\n' + dataTableCols + '\n\n' + formFields + '\n');
+
+              // Replace arrays in NgModule
+              fileContent = fileContent.replace('/* LIST_VIEW_FIELDS */', dataTableCols);
+              fileContent = fileContent.replace('/* FORM_FIELDS */', formFields);
+              fileContent = fileContent.replace('/* SEARCH_FORM */', searchFormFields);
+
+              
+              await fs.promises.writeFile(fullPath, fileContent, 'utf8');
+          }
+      }
+    }
+  }
+}
+
+//==========================================================================================
+//                         Enhance Forms HTML
+//==========================================================================================
+
+function generateFormHtml(fields: string[]): string {
+  const cleanFields = fields.filter(f => f.trim().toLowerCase() !== 'id');
+  const mid = Math.ceil(cleanFields.length / 2);
+
+  const toFormGroup = (f: string) => `
+                <div class="form-group">
+                  <with-validation>
+                    <label>${readableCase(f)}</label>
+                    <input validate required formControlName="${f}" class="form-control" placeholder="${readableCase(f)}"/>
+                  </with-validation>
+                </div>`;
+
+  const leftFields = cleanFields.slice(0, mid).map(toFormGroup).join("\n");
+  const rightFields = cleanFields.slice(mid).map(toFormGroup).join("\n");
+
+  return `
+    <div class="row">
+      <div class="col-md-6">
+    ${leftFields}
+      </div>
+      <div class="col-md-6">
+    ${rightFields}
+      </div>
+    </div>`;
+}
+
+function insertFormContent(formContent: string, createFormHtml: string): string {
+  const placeholder = '<!-- FORM PLACE HOLDER -->';
+
+  // Find placeholder indent
+  const lines = formContent.split('\n');
+  const placeholderLine = lines.find(line => line.includes(placeholder)) || '';
+  const indentMatch = placeholderLine.match(/^(\s*)/);
+  const baseIndent = indentMatch ? indentMatch[1] : '';
+
+  // Normalize the inserted block indentation
+  const htmlLines = createFormHtml.split('\n');
+
+  // Find the minimum non-empty indent in the block
+  const minIndent = Math.min(
+    ...htmlLines
+      .filter(line => line.trim())
+      .map(line => (line.match(/^(\s*)/)?.[1].length ?? 0))
+  );
+
+  const normalizedHtml = htmlLines
+    .map(line => line.slice(minIndent)) // remove extra indent
+    .map(line => (line.trim() ? baseIndent + line : '')) // add base indent
+    .join('\n');
+
+  return formContent.replace(
+    placeholder,
+    `${normalizedHtml}\n${baseIndent}${placeholder}`
+  );
+}
+
+
+async function enhanceFormHtml(libraryName, entities) {
+  const uiDir = path.join(__destPath, 'src', 'lib', 'ui');
+  const domainDir = path.join(__destPath, 'src', 'lib', 'models', 'domain');
+
+  // Build full paths for form files
+  const createFormFiles = entities.map(e =>
+    path.join(uiDir, kebabCase(e), 'create', 'create.component.html')
+  );
+  const editFormFiles = entities.map(e =>
+    path.join(uiDir, kebabCase(e), 'edit', 'edit.component.html')
+  );
+
+  // Build entity model file map
+  const entityFiles = entities.reduce((map, e) => {
+    map[kebabCase(e)] = path.join(domainDir, `${kebabCase(e)}.model.ts`);
+    return map;
+  }, {} as Record<string, string>);
+
+  // Loop through create form files
+  for (const formPath of createFormFiles) {
+    try {
+      const stat = await fs.promises.stat(formPath);
+
+      if (stat.isFile()) {
+        const entityName = path.basename(path.dirname(path.dirname(formPath))); // folder = entity name
+        console.log(entityName);
+        const modelFile = `${entityName}.model.ts`;
+        const modelPath = entityFiles[entityName];
+
+        // console.log(`Found create form: ${formPath}`);
+        // console.log(`Corresponding model: ${modelPath}`);
+
+        let modelContent = await fs.promises.readFile(modelPath, 'utf8');
+        const interfaceName = getInterfaceNameFromFileName(modelFile);
+        const fieldNames = parseInterface(modelContent, interfaceName);
+
+        if(fieldNames) {
+          logInfo(`<${interfaceName}> Generating Create Form Html.`);
+          let formContent = await fs.promises.readFile(formPath, 'utf8');
+          const createFormHtml = generateFormHtml(fieldNames);
+          formContent = insertFormContent(formContent, createFormHtml);
+          await fs.promises.writeFile(formPath, formContent, 'utf8');
+        }
+      }
+    } catch {
+      // form file doesn’t exist
+    }
+  }
+
+  for (const formPath of editFormFiles) {
+    try {
+      const stat = await fs.promises.stat(formPath);
+
+      if (stat.isFile()) {
+        const entityName = path.basename(path.dirname(path.dirname(formPath))); // folder = entity name
+        console.log(entityName);
+        const modelFile = `${entityName}.model.ts`;
+        const modelPath = entityFiles[entityName];
+
+        // logInfo(`Found edit form: ${formPath}`);
+        // logInfo(`Corresponding model: ${modelPath}`);
+
+        let modelContent = await fs.promises.readFile(modelPath, 'utf8');
+        const interfaceName = getInterfaceNameFromFileName(modelFile);
+        const fieldNames = parseInterface(modelContent, interfaceName);
+
+        if(fieldNames) {
+          logInfo(`<${interfaceName}> Generating Edit Form Html.`);
+          let formContent = await fs.promises.readFile(formPath, 'utf8');
+          const editFormHtml = generateFormHtml(fieldNames);
+          formContent = insertFormContent(formContent, editFormHtml);
+          await fs.promises.writeFile(formPath, formContent, 'utf8');
+        }
+      }
+    } catch {
+      // form file doesn’t exist
+    }
+  }
+}
+
+
+// ------------------------------------------------------------------------------------------------------------
+// ---------------------        COOMON FILE FUNCTIONS             ------------------------------------------
+// ------------------------------------------------------------------------------------------------------------
+
+export async function enhanceIndexFile(
+  dirPath: string,
+  options?: { key?: string; recursive?: boolean }
+) {
+  const key = options?.key;
+  const recursive = options?.recursive ?? false;
+
+  const indexFilePath = path.join(dirPath, 'index.ts');
+
+  let content = await fs.pathExists(indexFilePath)
+    ? await fs.readFile(indexFilePath, 'utf8')
+    : '';
+
+  const filesToExport: string[] = [];
+
+  async function scan(currentDir: string) {
+    const files = await fs.readdir(currentDir);
+
+    for (const file of files) {
+      const fullPath = path.join(currentDir, file);
+      const stat = await fs.stat(fullPath);
+
+      if (stat.isDirectory()) {
+        if (recursive) {
+          await scan(fullPath);
+        }
+        continue;
+      }
+
+      if (stat.isFile() && file !== 'index.ts') {
+        const isMatch = key ? file.endsWith(`.${key}.ts`) : true;
+        if (isMatch) filesToExport.push(fullPath);
+      }
+    }
+  }
+
+  // scan dirs
+  await scan(dirPath);
+
+  const exportLinesToAppend = filesToExport
+    .map(f => {
+      const rel = './' + path.relative(dirPath, f).replace(/\\/g, '/').replace('.ts', '');
+      return `export * from '${rel}';`;
+    })
+    .filter(l => !content.includes(l));  // avoid duplicates
+
+  if (exportLinesToAppend.length) {
+    content += '\n\n' + exportLinesToAppend.join('\n');
+    await fs.writeFile(indexFilePath, content, 'utf8');
+  }
+}
+
+
+//==========================================================================================
+//                         Add New Entity
+//==========================================================================================
+
+/**
+ * 
+ * templateRoot: path/to/temple/src 
+ * destRoot: path/to/dest/src 
+ * 
+ */
+async function copyEntityToLibrary(templateSrc, destSrc, entityName) {
+  
+  const kebab = kebabCase(entityName);
+  const pascal = pascalCase(entityName);
+
+  walkAndCopy(templateSrc, destSrc);
+
+  const libPath = path.join(destSrc, 'lib')
+
+  logInfo('Updating domain model export file content.');
+  const domainModelDir = path.join(libPath, 'models', 'domain');
+  await enhanceIndexFile(domainModelDir, { key: 'model' });
+
+  logInfo('Updating form model export file content.');
+  const searchModelDir = path.join(libPath, 'models', 'forms');
+  await enhanceIndexFile(searchModelDir, { key: 'search' });
+  
+  logInfo('Updating shared export file content.');
+  const sharedDir = path.join(libPath, 'shared');
+  await enhanceIndexFile(sharedDir, { recursive: true });
+
+  logInfo('Updating store export file content.');
+  const storeDir = path.join(libPath, 'store');
+  await enhanceIndexFile(storeDir, { recursive: true });
+
+  function walkAndCopy(srcDir, targetDir) {
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+      let srcPath = path.join(srcDir, entry.name);
+      let relPath = path.relative(templateSrc, srcPath);
+
+      // Only process files/folders with `_entity_` in their name/path
+      if (!relPath.includes('_entity_') && entry.isFile()) continue;
+
+      // Replace placeholders in relative path
+      let replacedRelPath = relPath
+        .replace(/_entity_/g, kebab)
+        .replace(/_Entity_/g, pascal);
+
+      let destPath = path.join(destSrc, replacedRelPath);
+
+      if (entry.isDirectory()) {
+        fs.mkdirSync(destPath, { recursive: true });
+        walkAndCopy(srcPath, destPath); // recurse
+      } else if (entry.isFile()) {
+        const fileContent = fs.readFileSync(srcPath, 'utf-8');
+
+        const replacedContent = replaceEntityPlaceHolders(fileContent, entityName);
+
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.writeFileSync(destPath, replacedContent);
+        logSuccess(`Created: ${replacedRelPath}`);
+      }
+    }
+  }
+}
+
+async function addEntity(section, library, entities) {
+  
+  const templateSrc = path.join(__tplPath, 'src');
+  const destSrc = path.join(__destPath, 'src');
+
+  // Loop through entities and call the function
+  for (const entityName of entities) {
+    logInfo(`Adding entity: ${entityName}`);
+    // logInfo(`FROM entity: ${templateRoot}`);
+    // logInfo(`TO entity: ${destRoot}`);
+    copyEntityToLibrary(templateSrc, destSrc, entityName);
+  }
+  
+  // Replace any section place holders
+  await replaceSectionPlaceholders(__destPath, section);
+
+  // Replace any library place holders
+  await replaceLibraryPlaceholders(destSrc, library);
+
+  logInfo('Updating provider file content.');
+  const providerFilePath = path.join(destSrc, 'lib', `${library}.providers.ts`);
+  await enhanceProviderFileWithEntities(providerFilePath, entities);
+
+  logInfo('Updating sandbox file  content (min).');
+  const sandboxFilePath = path.join(destSrc, 'lib', `${library}.sandbox.ts`);
+  const microStubFile = entities.length > 1 ? 'sandbox.multi.stub' : 'sandbox.min.stub';
+  const sandboxMicroStubFilePath = path.join(__tplPath, 'stub', microStubFile);
+  await enhanceSandboxFileUsingMicroStub(sandboxFilePath, sandboxMicroStubFilePath, entities, 'append');
+
+  logInfo('Updating routes file content.');
+  const routingFilePath = path.join(destSrc, 'lib', `${library}.routes.ts`);
+  const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
+  const routingStubFilePath = path.join(__tplPath, 'stub', routingStubFile);
+  await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities, 'append');
+}
+
+//==========================================================================================
+//                         Generate Library
+//==========================================================================================
+
+async function generateLibrary(sectionName, libraryName, entities) {
+  logInfo(`Generating library: ${libraryName}`);
+  try {
+    await copyTemplateContents(__tplPath, __destPath);
+    logInfo(`Copied template to ${__destPath}`);
+
+    await replaceSectionPlaceholders(__destPath, sectionName);
+
+    await replaceLibraryPlaceholders(__destPath, libraryName);
+
+    const libPath = path.join(__destPath, 'src', 'lib');
+    const entityTemplates = findEntityTemplates(libPath);
+
+    if (entityTemplates.length === 0) {
+      logWarning('⚠️ No _entity_ templates found.');
+    }
+
+    for (const entity of entities) {
+      await copyEntityTemplates(libPath, entityTemplates, entity);
+    }
+
+    logInfo('Removing entity template files & folders.');
+    await removeEntityTemplates(entityTemplates);
+
+    logInfo('Generating domain model export file content.');
+    const domainModelDir = path.join(libPath, 'models', 'domain');
+    await enhanceIndexFile(domainModelDir, { key: 'model' });
+
+    logInfo('Generating form model export file content.');
+    const searchModelDir = path.join(libPath, 'models', 'forms');
+    await enhanceIndexFile(searchModelDir, { key: 'search' });
+    
+    logInfo('Generating shared export file content.');
+    const sharedDir = path.join(libPath, 'shared');
+    await enhanceIndexFile(sharedDir, { recursive: true });
+
+    logInfo('Generating store export file content.');
+    const storeDir = path.join(libPath, 'store');
+    await enhanceIndexFile(storeDir, { recursive: true });
+    
+    logInfo('Generating providers file content.');
+    const providersFilePath = path.join(libPath, `${libraryName}.providers.ts`);
+    await enhanceProviderFileWithEntities(providersFilePath, entities);;
+
+    logInfo('Generating sandbox file content (min).');
+    const sandboxFilePath = path.join(libPath, `${library}.sandbox.ts`);
+    const microStubFile = entities.length > 1 ? 'sandbox.min.stub' : 'sandbox.min.stub';
+    const sandboxMicroStubFilePath = path.join(__tplPath, 'stub', microStubFile);
+    await enhanceSandboxFileUsingMicroStub(sandboxFilePath, sandboxMicroStubFilePath, entities);
+
+    logInfo('Generating routes file content.');
+    const routingFilePath = path.join(libPath, `${libraryName}.routes.ts`);
+    const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
+    const routingStubFilePath = path.join(__tplPath, 'stub', routingStubFile);
+    await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities);
+
+    logSuccess('Library generated successfully.');
+  } catch (err) {
+    logError(err);
+  }
+}
+
+function findEntityTemplates(dir) {
+  const result = [];
+
+  const walk = (currentPath) => {
+    const items = fs.readdirSync(currentPath, { withFileTypes: true });
+
+    for (const item of items) {
+      // Skip the .git folder
+      if (item.name === ".git") {
+        continue;
+      }
+
+      const fullPath = path.join(currentPath, item.name);
+
+      if (
+        item.name.includes('_entity_')
+         || item.name.includes('_Entity_')
+         //|| item.name.includes('entity-endpoint')
+      ) {
+        result.push(fullPath);
+      }
+
+      if (item.isDirectory()) {
+        walk(fullPath);
+      }
+    }
+  };
+
+  walk(dir);
+  return result;
+}
+
 async function replaceInFile(filePath, entity) {
   const stat = await fs.stat(filePath);
   if (stat.isFile()) {
@@ -401,6 +1093,10 @@ async function replaceInFile(filePath, entity) {
 async function walkAndReplace(dir, entity) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
+    // Skip the .git folder
+    if (entry.name === ".git") {
+      continue;
+    }
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       await walkAndReplace(fullPath, entity);
@@ -414,7 +1110,7 @@ async function copyTemplateContents(templateDir, destDir) {
   const entries = await fs.readdir(templateDir);
   
   for (const entry of entries) {
-    if (entry === 'stub') continue; // skip stub folder
+    if (entry === 'stub' || entry === 'cui.ts') continue; // skip stub folder & cui.ts
     
     const srcPath = path.join(templateDir, entry);
     const destPath = path.join(destDir, entry);
@@ -468,6 +1164,11 @@ async function replaceLibraryPlaceholders(destPath, libraryName) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
+      // Skip the .git folder
+      if (entry.name === ".git") {
+        continue;
+      }
+
       const oldPath = path.join(dir, entry.name);
 
       let newName = entry.name
@@ -492,401 +1193,34 @@ async function replaceLibraryPlaceholders(destPath, libraryName) {
   await walk(destPath);
 }
 
-async function enhanceIndexFile(dirPath, key?) {
-  const exportSet = new Set();
-  
-  const indexFilePath = path.join(dirPath, 'index.ts');
+async function replaceSectionPlaceholders(destPath, sectionName) {
+  const pascalName = pascalCase(sectionName);
 
-  let content = '';
-  if (await fs.pathExists(indexFilePath)) {
-    content = await fs.readFile(indexFilePath, 'utf8');
-  }
+  const walk = async (dir) => {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
 
-  const files = await fs.readdir(dirPath);
+    for (const entry of entries) {
+      // Skip the .git folder
+      if (entry.name === ".git") {
+        continue;
+      }
 
-  for (const file of files) {
-    const fullPath = path.join(dirPath, file);
-    const stat = await fs.stat(fullPath);
+      const filePath = path.join(dir, entry.name);
 
-    if (stat.isFile() && file !== 'index.ts') {
-      const isMatch = key ? file.endsWith(`.${key}.ts`) : true;
-      if (isMatch) {
-        const baseName = path.basename(file, '.ts');
-        const exportLine = `export * from './${baseName}';`;
-        if (!content.includes(exportLine)) {
-          exportSet.add(exportLine);
-        }
+      if (entry.isDirectory()) {
+        await walk(filePath);
+      } else {
+        let content = await fs.readFile(filePath, 'utf8');
+        content = content
+          .replace(/_section_/g, sectionName)
+          .replace(/_Section_/g, pascalName);
+        await fs.writeFile(filePath, content, 'utf8');
       }
     }
-  }
+  };
 
-  const exportSection = Array.from(exportSet).join('\n');
-
-  content = `${content}\n\n${exportSection}`;
-  await fs.writeFile(indexFilePath, content, 'utf8');
+  await walk(destPath);
 }
-
-async function enhanceModuleFileWithEntities(moduleFilePath, entities) {
-  let content = await fs.readFile(moduleFilePath, 'utf8');
-
-  const importSet = new Set();
-  const componentImportSet = new Set();
-  const storeSet = new Set();
-  const sharedSet = new Set();
-  
-
-  const ngModuleDeclarationSet = new Set();
-  const ngModuleProviderSet = new Set();
-  const ngModuleImportsEffect = [];
-  const ngModuleImportsReducer = [];
-
-  const entryComponentImportLine = `import { EntryComponent } from './entry.component';`
-  if (!content.includes(entryComponentImportLine)) {
-    componentImportSet.add(entryComponentImportLine);
-  }
-
-  ngModuleDeclarationSet.add(`EntryComponent`);
-
-  for (const entity of entities) {
-    const pascalEntity = pascalCase(entity);
-    const kebabEntity = kebabCase(entity);
-
-    const storeFeature = `from${pascalEntity}`;
-    storeSet.add(storeFeature);
-    storeSet.add(`${pascalEntity}Effects `);
-    sharedSet.add(`${pascalEntity}HttpService`);
-
-    //const listingComponent = `ListingComponent as ${pascalEntity}ListingComponent`;
-    const listingComponent = `${pascalEntity}ListingComponent`;
-    const listingImport = `import { ${listingComponent} } from './ui/${kebabEntity}/listing.component';`;
-    const createFormImport = `import { ${pascalEntity}CreateComponent } from './ui/${kebabEntity}/create/create.component';`;
-    const editFormImport = `import { ${pascalEntity}EditComponent } from './ui/${kebabEntity}/edit/edit.component';`;
-    componentImportSet
-      .add(listingImport)
-      .add(createFormImport)
-      .add(editFormImport);
-
-    // Declarations, Providers, Imports, Exports
-    ngModuleDeclarationSet
-      .add(`${pascalEntity}ListingComponent`)
-      .add(`${pascalEntity}CreateComponent`)
-      .add(`${pascalEntity}EditComponent`);
-
-    ngModuleProviderSet.add(`${pascalEntity}HttpService`);
-    ngModuleImportsEffect.push(`${pascalEntity}Effects`);
-    ngModuleImportsReducer.push(`StoreModule.forFeature(${storeFeature}.featureKey, ${storeFeature}.reducer)`);
-  }
-
-  const storeImport = formatMultiLineImport(storeSet, './store');
-  importSet.add(storeImport);
-
-  const sharedImport = formatMultiLineImport(sharedSet, './shared');
-  importSet.add(sharedImport);
-
-  const combinedImportSet = new Set([
-    ...importSet,
-    ...componentImportSet
-  ]);
-
-  // Inject imports before @NgModule
-  const importSection = Array.from(combinedImportSet).join('\n');
-  content = content.replace(/(@NgModule)/, `${importSection}\n\n$1`);
-
-  // Replace arrays in NgModule
-  content = patchNgModuleArray(content, 'declarations', Array.from(ngModuleDeclarationSet));
-  content = patchNgModuleArray(content, 'providers', Array.from(ngModuleProviderSet));
-  content = patchNgModuleArray(content, 'exports', Array.from(ngModuleDeclarationSet)); // Re-export listings
-  content = patchNgModuleArray(content, 'imports', [...ngModuleImportsReducer]);
-  content = patchNgModuleArray(content, 'imports', [`EffectsModule.forFeature([${ngModuleImportsEffect.join(', ')}])`]);
-
-  await fs.writeFile(moduleFilePath, content, 'utf8');
-}
-
-function patchNgModuleArray(content, key, valuesToAdd) {
-  const startRegex = new RegExp(`${key}:\\s*\\[`, 'm');
-  const startMatch = startRegex.exec(content);
-  if (!startMatch) return content;
-
-  const startIdx = startMatch.index + startMatch[0].length;
-  let endIdx = startIdx;
-  let depth = 1;
-
-  while (endIdx < content.length && depth > 0) {
-    const char = content[endIdx];
-    if (char === '[') depth++;
-    else if (char === ']') depth--;
-    endIdx++;
-  }
-
-  const innerContent = content.slice(startIdx, endIdx - 1);
-  const existingItems = smartSplit(innerContent)
-    .map(v => v.trim())
-    .filter(Boolean);
-
-  const existingSet = new Set(existingItems);
-  for (const val of valuesToAdd) {
-    if (!existingSet.has(val)) existingSet.add(val);
-  }
-
-  const updatedItems = Array.from(existingSet).join(',\n    ');
-  const newArray = `${key}: [\n    ${updatedItems}\n  ]`;
-
-  // Replace the whole old array
-  const before = content.slice(0, startMatch.index);
-  const after = content.slice(endIdx);
-  return `${before}${newArray}${after}`;
-}
-
-async function enhanceSandboxFileUsingStub(targetFilePath, stubFile, entities, mode = 'new') {
-
-  let content = await fs.readFile(targetFilePath, 'utf8');
-  let stubContent = await fs.readFile(stubFile, 'utf8');
-
-  const importSet = new Set();
-  const stubContentSet = new Set();
-
-  const storeSet = new Set();
-  const modelSet = new Set();
-
-  for (const entity of entities) {
-    const pascalEntity = pascalCase(entity);
-
-    storeSet.add(`from${pascalEntity}`);
-    storeSet.add(`${pascalEntity}Actions`);
-
-    modelSet.add(`${pascalEntity}`);
-    modelSet.add(`${pascalEntity}Search`);
-    
-    let temp = replaceEntityPlaceHolders(stubContent, entity);
-  
-    stubContentSet.add(temp);;
-  }
-
-  const storeImport = formatMultiLineImport(storeSet, './store');
-  const modelImport = formatMultiLineImport(modelSet, './models');
-
-  importSet.add(storeImport);
-  importSet.add(modelImport);
-
-  // Inject imports before @Injectable()
-  const importSection = Array.from(importSet).join('\n');
-  content = content.replace(/(@Injectable())/, `${importSection}\n\n$1`);
-
-  // Replace arrays in NgModule
-  const stubSection = Array.from(stubContentSet).join('\n\n\n');
-  // content = content.replace('/* STUB_CONTENT */', stubSection + '\n\n/* STUB_CONTENT */');
-
-  content = insertStubSection(content, stubSection.trim(), mode);
-
-  await fs.writeFile(targetFilePath, content, 'utf8');
-}
-
-async function enhanceRoutingFileUsingStub(targetFilePath, stubFile, entities, mode='new') {
-
-  let content = await fs.readFile(targetFilePath, 'utf8');
-  let stubContent = await fs.readFile(stubFile, 'utf8');
-
-  const importSet = new Set();
-  const componentImportSet = new Set();
-  const stubContentSet = new Set();
-
-  for (const entity of entities) {
-    const pascalEntity = pascalCase(entity);
-    const kebabEntity = kebabCase(entity);
-
-    const listingComponent = `${pascalEntity}ListingComponent`;
-    const listingImport = `import { ${listingComponent} } from './ui/${kebabEntity}/listing.component';`;
-    componentImportSet.add(listingImport);
-    
-    let temp = replaceEntityPlaceHolders(stubContent, entity);
-
-    stubContentSet.add(temp);;
-  }
-
-  const combinedImportSet = new Set([
-    ...importSet,
-    ...componentImportSet
-  ]);
-
-  // Inject imports before route declaration 
-  const importSection = Array.from(combinedImportSet).join('\n');
-   content = content.replace(
-    /^(.*const\s+routes\s*:\s*Routes\s*=\s*\[.*)$/m,
-    `${importSection}\n\n\n$1`
-  );
-
-  //const stubSection = Array.from(stubContentSet).join(',\n');
-  //content = content.replace('/* STUB_CONTENT */', stubSection);
-  content = insertStubRoutes(content, stubContentSet, mode, true);
-
-  await fs.writeFile(targetFilePath, content, 'utf8');
-}
-
-function formatMultiLineImport(identifiers, source) {
-  return `import {\n  ${Array.from(identifiers).join(',\n  ')}\n} from '${source}';`;
-}
-
-function formatSingleLineImport(identifiers, source) {
-  `import { ${Array.from(identifiers).join(',\n ')} } from '${source}';`;
-}
-
-async function generateLibrary(libraryName, entities) {
-  logInfo(`Generating library: ${libraryName}`);
-  try {
-    await copyTemplateContents(__tplPath, __destPath);
-    logInfo(`Copied template to ${__destPath}`);
-
-    await replaceLibraryPlaceholders(__destPath, libraryName);
-
-    const libPath = path.join(__destPath, 'src', 'lib');
-    const entityTemplates = findEntityTemplates(libPath);
-
-    if (entityTemplates.length === 0) {
-      logWarning('⚠️ No _entity_ templates found.');
-    }
-
-    for (const entity of entities) {
-      await copyEntityTemplates(libPath, entityTemplates, entity);
-    }
-
-    logInfo('Removing entity template files & folders.');
-    await removeEntityTemplates(entityTemplates);
-
-    logInfo('Generating domain model export file content.');
-    const domainModelDir = path.join(libPath, 'models', 'domain');
-    await enhanceIndexFile(domainModelDir, 'model');
-
-    logInfo('Generating form model export file content.');
-    const searchModelDir = path.join(libPath, 'models', 'forms');
-    await enhanceIndexFile(searchModelDir, 'search');
-    
-    logInfo('Generating shared export file content.');
-    const sharedDir = path.join(libPath, 'shared');
-    await enhanceIndexFile(sharedDir);
-
-    logInfo('Generating store export file content.');
-    const storeDir = path.join(libPath, 'store');
-    await enhanceIndexFile(storeDir);
-
-    logInfo('Generating module file content.');
-    const moduleFilePath = path.join(libPath, `${libraryName}.module.ts`);
-    await enhanceModuleFileWithEntities(moduleFilePath, entities);
-    
-    logInfo('Generating sandbox file content.');
-    const sandboxFilePath = path.join(libPath, `${libraryName}.sandbox.ts`);
-    const stubFile = entities.length > 1 ? 'sandbox.multi.stub' : 'sandbox.stub';
-    const sandboxStubFilePath = path.join(__tplPath, 'stub', stubFile);
-    await enhanceSandboxFileUsingStub(sandboxFilePath, sandboxStubFilePath, entities);
-
-    logInfo('Generating routing file content.');
-    const routingFilePath = path.join(libPath, `${libraryName}-routing.module.ts`);
-    const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
-    const routingStubFilePath = path.join(__tplPath, 'stub', routingStubFile);
-    await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities);
-
-    logSuccess('Library generated successfully.');
-  } catch (err) {
-    logError(err);
-  }
-}
-
-
-//==========================================================================================
-//                         Enhance Models  (Add Form & Datatable Fields)
-//==========================================================================================
-
-function getInterfaceNameFromFileName(fileName: string): string {
-  // Remove extension
-  const baseName = fileName.replace(/\.model\.ts$/, '');
-  
-  // Convert kebab-case or snake_case to PascalCase
-  const pascalCase = baseName
-    .split(/[-_]/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-
-  return `I${pascalCase}`;
-}
-
-function parseInterface(content, interfaceName) {
-  const regex = new RegExp(`export interface ${interfaceName} {([\\s\\S]*?)}`, 'm');
-  const match = content.match(regex);
-
-  if (!match) {
-    //throw new Error(`Interface ${interfaceName} not found`);
-    logError(`Interface ${interfaceName} not found`);
-    return false;
-  } else {
-    const fieldsBlock = match[1];
-    const fieldLines = fieldsBlock
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .filter((line) => line.includes(':'));
-
-    const fieldNames = fieldLines.map((line) => {
-        const [key] = line.split(':');
-        return key.replace(/[?]/g, '').trim();
-    });
-
-    return fieldNames;
-  }
-  
-}
-
-function generateListViewFields(fields: string[]): string {
-  const lines = fields.map(
-    (f) => `    { key: '${f}', label: '${readableCase(f)}' }`
-  ).join(',\n');
-
-  return `static override get listViewFields(): FieldDescriptor[] {\n  return [\n${lines}\n  ];\n}\n`;
-}
-
-
-function generateFormFields(fields: string[]): string {
-  const lines = fields.map((f) => `  '${f}'`).join(',\n');
-
-  return `static override formFields?: string[] = [\n${lines}\n];\n`;
-}
-
-async function enhanceModels(libraryName) {
-  
-  const domainDir = path.join(__destPath, 'src', 'lib', 'models', 'domain');
-
-  const files = await fs.promises.readdir(domainDir);
-
-  for (const file of files) {
-    const fullPath = path.join(domainDir, file);
-    const stat = await fs.promises.stat(fullPath);
-
-    if (stat.isFile() && file !== 'index.ts') { 
-        let fileContent = await fs.promises.readFile(fullPath, 'utf8');
-
-        const interfaceName = getInterfaceNameFromFileName(file);
-        
-        const fieldNames = parseInterface(fileContent, interfaceName);
-
-        if(fieldNames) {
-            logInfo(`<${interfaceName}> Generating listViewFields.`);
-            const listViewFields = generateListViewFields(fieldNames);
-
-            logInfo(`<${interfaceName}> Generating formFields.`);
-            const formFields = generateFormFields(fieldNames);
-
-            // Output both
-            // console.log('\n\n' + listViewFields + '\n\n' + formFields + '\n');
-
-            // Replace arrays in NgModule
-            fileContent = fileContent.replace('/* LIST_VIEW_FIELDS */', listViewFields);
-            fileContent = fileContent.replace('/* FORM_FIELDS */', formFields);
-
-            
-            await fs.promises.writeFile(fullPath, fileContent, 'utf8');
-        }
-    }
-  }
-}
-
 
 //==========================================================================================
 //                              Print Directory Structure
@@ -924,104 +1258,6 @@ function printNestedTree(name, items, indent = '') {
 
 
 //==========================================================================================
-//                                    Add New Entity
-//==========================================================================================
-
-/**
- * 
- * templateRoot: path/to/temple/src 
- * destRoot: path/to/dest/src 
- * 
- */
-async function copyEntityToLibrary(templateSrc, destSrc, entityName) {
-  
-  const kebab = kebabCase(entityName);
-  const pascal = pascalCase(entityName);
-
-  walkAndCopy(templateSrc, destSrc);
-
-  const libPath = path.join(destSrc, 'lib')
-
-  logInfo('Updating domain model export file content.');
-  const domainModelDir = path.join(libPath, 'models', 'domain');
-  await enhanceIndexFile(domainModelDir, 'model');
-
-  logInfo('Updating form model export file content.');
-  const searchModelDir = path.join(libPath, 'models', 'forms');
-  await enhanceIndexFile(searchModelDir, 'search');
-  
-  logInfo('Updating shared export file content.');
-  const sharedDir = path.join(libPath, 'shared');
-  await enhanceIndexFile(sharedDir);
-
-  logInfo('Updating store export file content.');
-  const storeDir = path.join(libPath, 'store');
-  await enhanceIndexFile(storeDir);
-
-  function walkAndCopy(srcDir, targetDir) {
-    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
-    for (const entry of entries) {
-      let srcPath = path.join(srcDir, entry.name);
-      let relPath = path.relative(templateSrc, srcPath);
-
-      // Only process files/folders with `_entity_` in their name/path
-      if (!relPath.includes('_entity_') && entry.isFile()) continue;
-
-      // Replace placeholders in relative path
-      let replacedRelPath = relPath
-        .replace(/_entity_/g, kebab)
-        .replace(/_Entity_/g, pascal);
-
-      let destPath = path.join(destSrc, replacedRelPath);
-
-      if (entry.isDirectory()) {
-        fs.mkdirSync(destPath, { recursive: true });
-        walkAndCopy(srcPath, destPath); // recurse
-      } else if (entry.isFile()) {
-        const fileContent = fs.readFileSync(srcPath, 'utf-8');
-
-        const replacedContent = replaceEntityPlaceHolders(fileContent, entityName);
-
-        fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        fs.writeFileSync(destPath, replacedContent);
-        logSuccess(`Created: ${replacedRelPath}`);
-      }
-    }
-  }
-}
-
-async function addEntity(library, entities) {
-  
-  const templateSrc = path.join(__tplPath, 'src');
-  const destSrc = path.join(__destPath, 'src');
-
-  // Loop through entities and call the function
-  for (const entityName of entities) {
-    logInfo(`Adding entity: ${entityName}`);
-    // logInfo(`FROM entity: ${templateRoot}`);
-    // logInfo(`TO entity: ${destRoot}`);
-    copyEntityToLibrary(templateSrc, destSrc, entityName);
-  }
-
-  logInfo('Updating module file content.');
-  const moduleFilePath = path.join(destSrc, 'lib', `${library}.module.ts`);
-  await enhanceModuleFileWithEntities(moduleFilePath, entities);
-  
-  logInfo('Updating sandbox file content.');
-  const sandboxFilePath = path.join(destSrc, 'lib', `${library}.sandbox.ts`);
-  const stubFile = entities.length > 1 ? 'sandbox.multi.stub' : 'sandbox.stub';
-  const sandboxStubFilePath = path.join(__tplPath, 'stub', stubFile);
-  await enhanceSandboxFileUsingStub(sandboxFilePath, sandboxStubFilePath, entities, 'append');
-
-  logInfo('Updating routing file content.');
-  const routingFilePath = path.join(destSrc, 'lib', `${library}-routing.module.ts`);
-  const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
-  const routingStubFilePath = path.join(__tplPath, 'stub', routingStubFile);
-  await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities, 'append');
-}
-
-
-//==========================================================================================
 //                                  CLI usage
 //==========================================================================================
 
@@ -1050,9 +1286,11 @@ namedFlags.forEach(flag => {
 });
 
 // Extract specific named args
-const library = flagMap.lib;
-const entities = flagMap.entities?.split(',') || [];
-const dest = flagMap.dest || library || '';
+const section = flagMap.section || flagMap.s || 'admin';
+const library = flagMap.lib || flagMap.l;
+const entities = flagMap.entities?.split(',') || flagMap.e?.split(',') || [];
+const dest = flagMap.dest || flagMap.d || library || '';
+const force = flagMap.force || flagMap.f || false;
 
 // ✅ Destination path (relative to where user runs the CLI)
 __destPath =  path.join(process.cwd(), dest);
@@ -1065,14 +1303,15 @@ __tplPath = flagMap.tpl || path.join(__dirname, 'template');
 validateCommand(command);
 switch (command) {
   case 'generate':
+  case 'create':
     validateSubCommand(command, subcommand, ['library']);
     validateLibrary(command, subcommand, library);    
     switch (subcommand) {
       case 'library':
           validateLibrary(command, subcommand, library);
           validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
-          generateLibrary(library, entities);
+          if (force) await getOverwritePermission();
+          generateLibrary(section, library, entities);
         break;
       
       default:
@@ -1084,15 +1323,21 @@ switch (command) {
     break;
 
   case 'update':
-    validateSubCommand(command, subcommand, ['model']);
+    validateSubCommand(command, subcommand, ['model', 'form']);
     validateLibrary(command, subcommand, library);
     switch (subcommand) {
       case 'model':
-          //validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
-          enhanceModels(library);
+          validateEntities(command, subcommand, library, entities);
+          if (force) await getOverwritePermission();
+          enhanceModels(library, entities);
         break;
       
+      case 'form':
+          validateEntities(command, subcommand, library, entities);
+          if (force) await getOverwritePermission();
+          enhanceFormHtml(library, entities);
+        break;
+
       default:
         logError(`Unknown sub command: ${command}`);
           process.exit(1);
@@ -1106,8 +1351,8 @@ switch (command) {
     switch (subcommand) {
       case 'entity':
           validateEntities(command, subcommand, library, entities);
-          await getOverwritePermission();
-          addEntity(library, entities)
+          if (force) await getOverwritePermission();
+          addEntity(section, library, entities)
         break;
       
       default:
@@ -1118,10 +1363,15 @@ switch (command) {
     break;
 
   case 'struct':
-    validateLibrary(command, subcommand, library); 
-    const templatePath = path.join(__tplPath);
-    const tree = getFilesAndFolders(templatePath);
-    printNestedTree('template', tree);
+    // validateLibrary(command, subcommand, library); 
+    let tree = null;
+    if(dest) {
+      tree = getFilesAndFolders(__destPath);
+      printNestedTree(dest, tree);
+    } else {
+      tree = getFilesAndFolders(__tplPath);
+       printNestedTree('template', tree);
+    }
     break;
 
   default:

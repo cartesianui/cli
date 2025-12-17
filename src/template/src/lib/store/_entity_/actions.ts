@@ -1,8 +1,8 @@
-import { createEntityActions } from '@cartesianui/common';
-import { _Entity_, _Entity_Search } from '../models';
+import { entityActions } from '@cartesianui/common';
+import { _Entity_ } from '../../models';
 
 
-const actions = createEntityActions<_Entity_, _Entity_Search, '_Entity_'>('_Entity_');
+const actions = entityActions<_Entity_, '_Entity_'>('_Entity_');
 
 // Example of extending the actions with custom actions
 
@@ -10,24 +10,24 @@ const actions = createEntityActions<_Entity_, _Entity_Search, '_Entity_'>('_Enti
 
 // export const additionalActions = {
 
-//     // It overrides the default createEntityActions
+//     // It overrides the default entityActions
 //     createEntity = createAction(
-//     '[Entity] Create Entity',
-//     props<{ entity: Entity }>()
+//     '[Entity] Create _Entity_',
+//     props<{ entity: _Entity_ }>()
 //     );
 
 //     ActivateEntity = createAction(
-//     '[Entity] Activate Entity',
+//     '[Entity] Activate _Entity_',
 //     props<{ id: string }>()
 //     );
 
 //     ActivateEntitySuccess = createAction(
-//     '[Entity] Activate Entity Success',
-//     props<{ entity: Entity }>()
+//     '[Entity] Activate _Entity_ Success',
+//     props<{ entity: _Entity_ }>()
 //     );
 
 //     ActivateEntityFailure = createAction(
-//     '[Entity] Activate Entity Failure',
+//     '[Entity] Activate _Entity_ Failure',
 //     props<{ message: string; errors?: any }>()
 //     );
 // };

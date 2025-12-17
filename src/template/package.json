@@ -1,13 +1,12 @@
 {
-  "name": "@cartesianui/bo-_library_",
-  "version": "1.0.1",
+  "name": "@cartesianui/_section_-_library_",
+  "version": "0.0.0",
   "peerDependencies": {
-    "@angular/common": "^16.2.2",
-    "@angular/core": "^16.2.2",
-    "@angular/forms": "^16.2.2",
+    "@angular/common": "^20.3.2",
+    "@angular/core": "^20.3.2",
+    "@angular/forms": "^20.3.2",
     "@cartesianui/core": "^2.0.0",
-    "@cartesianui/common": "^1.0.0",
-    "@cartesianui/bo-auth": "^1.0.0"
+    "@cartesianui/common": "^1.0.0"
   },
   "dependencies": {
     "tslib": "^2.4.0"

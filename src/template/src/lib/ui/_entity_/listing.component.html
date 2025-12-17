@@ -1,49 +1,91 @@
-<page-title [title]="'_Entity_'"></page-title>
-<page-actions (search)="search()" (create)="showChildComponent(childComponents.createForm)"></page-actions>
-<app-offcanvas id="_entity_-forms" [title]="childComponentSelected && childComponentSelected?.title" [visible]="childSelected" (visibleChange)="hideChildComponent($event)">
-  <bo-create-_entity_-form *ngIf="isComponentSelected(childComponents.createForm)" (created)="onCreated()" ></bo-create-_entity_-form>
-  <bo-edit-_entity_-form *ngIf="isComponentSelected(childComponents.editForm)"></bo-edit-_entity_-form>
+<page-title [title]="'_PEntity_'"></page-title>
+<page-actions
+  (delete)="onDelete()"
+  (import)="onSearch($event)" 
+  (export)="onSearch($event)" 
+  (searchChange)="onSearch($event)" 
+  (dateRangeChange)="onDateChange($event)" 
+  (create)="showChildComponent(childComponents.createForm, 'createForm')"
+  [disabled]="{
+    delete: selected.length !== 1
+  }"
+></page-actions>
+<app-offcanvas
+  id="_entity_-forms"
+  [title]="childComponentSelected && childComponentSelected?.title"
+  [visible]="childSelected"
+  (visibleChange)="hideChildComponent($event)"
+>
+  <_section_-create-_entity_-form
+     *ngIf="selectedChildKey === 'createForm'"
+    (created)="onCreated()"
+  ></_section_-create-_entity_-form>
+  <_section_-edit-_entity_-form
+     *ngIf="selectedChildKey === 'editForm'"
+  ></_section_-edit-_entity_-form>
 </app-offcanvas>
 
-<div class="animated fadeIn dt" #dtContainer>
+<div class="main-content dt" #dtContainer>
   <div class="row">
     <div class="col-md-12 my-2">
-      <span class="float-end">Total: {{ pagination.total }}</span>
+      <span class="float-end">Total: {{ sb._entityName_.pagination()?.total }}</span>
     </div>
   </div>
   <div class="card">
     <div class="card-body">
       <ngx-datatable
         class="material"
-        [rows]="sb._entityName_Entities$ | async"
+        [rows]="sb._entityName_.entities()"
         [columns]="headers"
         [columnMode]="'force'"
         [headerHeight]="50"
         [footerHeight]="50"
         [rowHeight]="43"
         [externalPaging]="true"
-        [count]="pagination.total"
+        [count]="sb._entityName_.pagination()?.total"
         [offset]="getOffsetFromPagination()"
-        [limit]="pagination.perPage"
+        [limit]="sb._entityName_.pagination()?.perPage"
         [selected]="selected"
         [selectionType]="'checkbox'"
         (select)="onSelect($event)"
         (page)="setPage($event)"
+        sortType="single"
       >
-        <ngx-datatable-column [width]="30" [sortable]="false" [canAutoResize]="false" [draggable]="false" [resizeable]="false" [headerCheckboxable]="true" [checkboxable]="true"></ngx-datatable-column>
-
         <ngx-datatable-column
-          *ngFor="let col of columns"
-          [name]="col.label"
-          [prop]="col.key"
-          [flexGrow]="1"
-          [minWidth]="150"
+          [width]="30"
+          [sortable]="false"
+          [canAutoResize]="false"
+          [draggable]="false"
+          [resizeable]="false"
+          [headerCheckboxable]="true"
+          [checkboxable]="true"
+        ></ngx-datatable-column>
+
+        <ngx-datatable-column 
+          *ngFor="let col of columns" 
+          [name]="col.label" 
+          [prop]="col.key" 
+          [width]="col?.opt?.width || undefined" 
+          [flexGrow]="col?.opt?.width ? 0 : 1" 
+          [minWidth]="col?.opt?.minWidth ?? '150'" 
+          [sortable]="true"
         >
           <ng-template let-row="row" ngx-datatable-cell-template>
-            <span>{{ row[col.key] }}</span>
+            <!-- Link Cell -->
+            <ng-container *ngIf="col?.opt?.link === true; else normalCell">
+              <a href="javascript:;" (click)="onEdit(row)">
+                {{ row.dtFormatted(col) }}
+              </a>
+            </ng-container>
+
+            <!-- Normal Cell -->
+            <ng-template #normalCell>
+              <span> 
+                  {{ row.dtFormatted(col) }}
+              </span>
+            </ng-template>
           </ng-template>
         </ngx-datatable-column>
-        
       </ngx-datatable>
     </div>
   </div>
