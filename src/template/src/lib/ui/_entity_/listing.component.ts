@@ -63,11 +63,11 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
   onDelete() {
     if (this.selected.length > 0) {
        this.message.confirm('Are you sure you want to delete this record?', 'Confirm Deletion', (confirmed) => {
-        if (confirmed) {
-          this.sb._entityName_.delete(this.selected[0].id);
-          this.selected = [];
-        }
-    });
+          if (confirmed) {
+            this.sb._entityName_.delete(this.selected[0].id);
+            this.selected = [];
+          }
+      });
     }
   }
 

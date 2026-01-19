@@ -3,12 +3,14 @@ import { Observable } from 'rxjs';
 import { IHttpService, HttpService, POST, GET, Body, Criteria, DefaultHeaders, RequestCriteriaOuput, Path, DELETE, PATCH, PUT } from '@cartesianui/core';
 import { _Entity_ } from '../../models';
 
+export type I_Entity_HttpServiceExtension = {};
+
 @Injectable()
 @DefaultHeaders({
   Accept: 'application/json',
   'Content-Type': 'application/json'
 })
-export class _Entity_HttpService extends HttpService implements IHttpService<_Entity_> {
+export class _Entity_HttpService extends HttpService implements IHttpService<_Entity_, I_Entity_HttpServiceExtension> {
 
   @GET('/_Pentity-name_')
   public getAll(@Criteria criteria: RequestCriteriaOuput): Observable<any> {
