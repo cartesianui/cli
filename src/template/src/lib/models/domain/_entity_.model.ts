@@ -7,8 +7,8 @@ export interface _IEntity_ {
 }
 
 export class _Entity_ extends BaseModel implements _IEntity_ {
-  public id: string;
-  public field?: string;
+  id: string;
+  field?: string;
 
   constructor(data?: _IEntity_) {
     super(data);
