@@ -3,7 +3,7 @@ import { Validators, ValidatorFn } from '@angular/forms';
 
 export interface _IEntity_ {
   id: string | undefined;
-  field?: any; // allow any other properties
+  field?: any; 
 }
 
 export class _Entity_ extends BaseModel implements _IEntity_ {
@@ -13,13 +13,4 @@ export class _Entity_ extends BaseModel implements _IEntity_ {
   constructor(data?: _IEntity_) {
     super(data);
   }
-
-  /* LIST_VIEW_FIELDS */
-
-
-  /* FORM_FIELDS */
-
-
-  /* SEARCH_FORM */
-
 }

@@ -1,5 +1,6 @@
 import { exitWithError } from './logger.js';
 
+/** @deprecated Validation is now handled by the command registry in commands.ts */
 export function validateCommand(command?: string) {
   if (!command) {
     exitWithError(
@@ -9,6 +10,7 @@ export function validateCommand(command?: string) {
   }
 }
 
+/** @deprecated Validation is now handled by the command registry in commands.ts */
 export function validateSubCommand(command: string, subcommand: string | undefined, allowedCmds: string[]) {
   if (!subcommand || !allowedCmds.includes(subcommand)) {
     exitWithError(
@@ -21,6 +23,7 @@ export function validateSubCommand(command: string, subcommand: string | undefin
   }
 }
 
+/** @deprecated Validation is now handled by the command registry in commands.ts */
 export function validateLibrary(command: string, subcommand?: string, library?: string) {
   if (!library) {
     exitWithError(
@@ -30,6 +33,7 @@ export function validateLibrary(command: string, subcommand?: string, library?: 
   }
 }
 
+/** @deprecated Validation is now handled by the command registry in commands.ts */
 export function validateEntities(command: string, subcommand: string | undefined, library: string | undefined, entities: string[], min = 1) {
   if (!entities || entities.length < min) {
     exitWithError(

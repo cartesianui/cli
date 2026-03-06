@@ -10,8 +10,6 @@ export const routes: Routes = [
     providers: [
       provide_Library_Feature()
     ],
-    children: [
-      /* STUB_CONTENT */
-    ]
+    children: []
   }
 ];

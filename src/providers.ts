@@ -1,163 +1,113 @@
-import fs from 'fs-extra';
-import { pascalCase, kebabCase } from './strings.js';
-import { insertImportSectionBeforeFirstExportFunc, formatMultiLineImport } from './code-insert.js';
+import { pascalCase } from './strings.js';
+import { addImportToContent, readFile, writeFile } from './ast-helpers.js';
 
-function injectIntoImportProvidersFrom(content: string, innerLines: string[]) {
-  return content.replace(
-    /(importProvidersFrom\s*\([\s\S]*?)(\n\s*\)\s*,)/m,
-    (_, start, end) => {
-      const indent = (start.match(/(\n\s*)[^\n]*$/)?.[1] ?? '\n      ');
-      const injected = innerLines.map(line => `${indent}${line},`).join('');
-      return `${start}${injected}${end}`;
-    }
-  );
-}
+export async function enhanceProviderFileWithEntities(moduleFilePath: string, entities: string[]) {
+  let content = await readFile(moduleFilePath);
 
-export function appendSharedProvidersAtEnd(
-  content: string,
-  providers: string[]
-): string {
-  if (!providers.length) return content;
-
-  return content.replace(
-    /makeEnvironmentProviders\(\s*\[((?:\[[^\]]*\]|[^\]])*)\]\s*\)/gm,
-    (m, inside) => {
-      const lines = inside.split('\n');
-
-      // find last non-empty real item line
-      let i = lines.length - 1;
-      while (i >= 0 && !lines[i].trim()) i--;
-
-      // add comma if last real element has no comma
-      if (i >= 0 && !lines[i].trim().endsWith(',')) {
-        lines[i] = lines[i] + ',';
-      }
-
-      // get indentation from last line OR at least 2 spaces
-      const indent = lines[i]?.match(/^\s*/)?.[0] ?? '  ';
-
-      // append
-      for (const p of providers) {
-        lines.push(`${indent}${p},`);
-      }
-
-      // return without touching ANYTHING else
-      return `makeEnvironmentProviders([${lines.join('\n')}])`;
-    }
-  );
-}
-
-function cleanupMakeEnvironmentProvidersFormatting(content: string) {
-
-  // remove comma right after [
-  content = content.replace(/\[\s*,/g, '[');
-
-  // ensure space after comma before ]
-  content = content.replace(/,\s*\]/g, ', ]');
-
-  // ensure there is newline after top-level [
-  content = content.replace(
-    /(makeEnvironmentProviders\(\s*\[)(\S)/gm,
-    (_m, a, b) => `${a}\n  ${b}`
-  );
-
-  // ensure newline before top-level ])
-  content = content.replace(
-    /(\S)(\]\s*\))/gm,
-    (_m, a, b) => `${a}\n${b}`
-  );
-
-  // trim and indent top-level providers block
-  content = content.replace(
-    /makeEnvironmentProviders\(\s*\[((?:\[[^\]]*\]|[^\]])*)\]\s*\)/gms,
-    (m, inside) => {
-      const lines = inside
-        .split('\n')
-        .map(x => x.trimEnd())
-        .filter((x, i) => !(i === 0 && x.trim() === '')) // remove empty first line
-        .map(l => '  ' + l); // indent 2 spaces
-
-      return `makeEnvironmentProviders([\n${lines.join('\n')}\n])`;
-    }
-  );
-
-  // collapse multi-line EffectsModule.forFeature([...]) arrays to single line
-  content = content.replace(
-    /EffectsModule\.forFeature\(\[\s*([\s\S]*?)\s*\]\)/gm,
-    (_m, inner) => {
-      const trimmed = inner
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l) // remove empty lines
-        .join(', '); // join with comma + space
-      return `EffectsModule.forFeature([${trimmed}])`;
-    }
-  );
-
-  return content;
-}
-
-export function transformProviders(
-  content: string, importSection: string, storeEffectSet: string[], storeFeatureSet: string[], sharedSet: string[]): string {
-
-  content = insertImportSectionBeforeFirstExportFunc(content, importSection);
-
-  content = injectIntoImportProvidersFrom(content, [
-    ...storeFeatureSet,
-    storeEffectSet.length
-      ? `EffectsModule.forFeature([${storeEffectSet.join(', ')}])`
-      : ''
-  ].filter(Boolean));
-
-  content = appendSharedProvidersAtEnd(content, sharedSet);
-
-  content = cleanupMakeEnvironmentProvidersFormatting(content);
-
-  return content;
-}
-
-export async function enhanceProviderFileWithEntities(moduleFilePath, entities) {
-  let content = await fs.readFile(moduleFilePath, 'utf8');
-
-  const importStatementSet = new Set();
-  const importStoreSet = new Set();
-  const importSharedSet = new Set();
-
-  const storeEffectSet =  [];
-  const storeFeatureSet =  [];
-  const httpServiceSet = new Set();
+  const storeImports: string[] = [];
+  const sharedImports: string[] = [];
+  const storeFeatureLines: string[] = [];
+  const effectsList: string[] = [];
+  const httpServices: string[] = [];
 
   for (const entity of entities) {
     const pascalEntity = pascalCase(entity);
+    const selectorName = `from${pascalEntity}`;
+    const effectsName = `${pascalEntity}Effects`;
+    const httpServiceName = `${pascalEntity}HttpService`;
 
-    // for import statements
-    const storeFeature = `from${pascalEntity}`;
-    importStoreSet.add(storeFeature);
-    importStoreSet.add(`${pascalEntity}Effects `);
-    importSharedSet.add(`${pascalEntity}HttpService`);
+    storeImports.push(selectorName, effectsName);
+    sharedImports.push(httpServiceName);
 
-    // to use in providers
-    httpServiceSet.add(`${pascalEntity}HttpService`);
-    storeEffectSet.push(`${pascalEntity}Effects`);
-    storeFeatureSet.push(`StoreModule.forFeature(${storeFeature}.featureKey, ${storeFeature}.reducer)`);
+    // Check if already present (idempotency)
+    if (!content.includes(`StoreModule.forFeature(${selectorName}.featureKey`)) {
+      storeFeatureLines.push(`      StoreModule.forFeature(${selectorName}.featureKey, ${selectorName}.reducer)`);
+    }
+    if (!content.includes(effectsName)) {
+      effectsList.push(effectsName);
+    }
+    if (!content.includes(httpServiceName)) {
+      httpServices.push(httpServiceName);
+    }
   }
 
-  const storeImports = formatMultiLineImport(importStoreSet, './store');
-  importStatementSet.add(storeImports);
+  // Add import declarations
+  if (storeImports.length) {
+    content = addImportToContent(content, './store', storeImports);
+  }
+  if (sharedImports.length) {
+    content = addImportToContent(content, './shared', sharedImports);
+  }
 
-  const sharedImports = formatMultiLineImport(importSharedSet, './shared');
-  importStatementSet.add(sharedImports);
+  // ── 1. Inject StoreModule.forFeature(...) lines into importProvidersFrom ──
+  if (storeFeatureLines.length) {
+    const storeBlock = storeFeatureLines.join(',\n');
+    content = content.replace(
+      /(\/\/ Store Providers)/,
+      `$1\n${storeBlock},`
+    );
+  }
 
-  const combinedImportStatementSet = new Set([
-    ...importStatementSet,
-  ]);
+  // ── 2. Add EffectsModule.forFeature([...]) after the last StoreModule.forFeature line ──
+  if (effectsList.length) {
+    const effectsLine = `      EffectsModule.forFeature([${effectsList.join(', ')}])`;
+    if (content.includes('EffectsModule.forFeature')) {
+      // Merge into existing
+      content = content.replace(
+        /EffectsModule\.forFeature\(\[([^\]]*)\]\)/,
+        (_, inner) => {
+          const existing = inner.split(',').map((s: string) => s.trim()).filter(Boolean);
+          const newEffects = effectsList.filter(e => !existing.includes(e));
+          const all = [...existing, ...newEffects];
+          return `EffectsModule.forFeature([${all.join(', ')}])`;
+        }
+      );
+    } else {
+      // Insert after the last StoreModule.forFeature line
+      const lines = content.split('\n');
+      let lastStoreIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('StoreModule.forFeature')) lastStoreIdx = i;
+      }
+      if (lastStoreIdx >= 0) {
+        lines.splice(lastStoreIdx + 1, 0, effectsLine);
+        content = lines.join('\n');
+      }
+    }
+  }
 
-  // Inject imports before @NgModule
-  const importSection = Array.from(combinedImportStatementSet).join('\n');
+  // ── 3. Add HttpServices to Root function (empty array) ──
+  if (httpServices.length) {
+    content = content.replace(
+      /(provide\w+Root\(\)[^{]*\{[\s\S]*?makeEnvironmentProviders\(\s*)\[([^\]]*)\]/m,
+      (_, before, inner) => {
+        const existing = inner.split(',').map((s: string) => s.trim()).filter(Boolean);
+        const newServices = httpServices.filter(s => !existing.includes(s));
+        const all = [...existing, ...newServices];
+        return `${before}[${all.join(', ')}]`;
+      }
+    );
+  }
 
-  const sharedSet = Array.from(httpServiceSet) as string[];
+  // ── 4. Add HttpServices after Sandbox in the Feature function ──
+  if (httpServices.length) {
+    const serviceLines = httpServices.map(s => `    ${s}`).join(',\n');
+    content = content.replace(
+      /(\s*)(\/\/ Shared Services)/,
+      `\n${serviceLines},\n    $2`
+    );
+  }
 
-  content = transformProviders(content, importSection, storeEffectSet, storeFeatureSet, sharedSet)
+  await writeFile(moduleFilePath, content);
+}
 
-  await fs.writeFile(moduleFilePath, content, 'utf8');
+// Deprecated: kept for backward compatibility
+export function transformProviders(
+  content: string, importSection: string, storeEffectSet: string[], storeFeatureSet: string[], sharedSet: string[]): string {
+  return content;
+}
+
+// Deprecated: kept for backward compatibility
+export function appendSharedProvidersAtEnd(content: string, providers: string[]): string {
+  return content;
 }

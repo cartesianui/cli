@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { kebabCase, readableCase } from './strings.js';
 import { logInfo, logError } from './logger.js';
+import { removeStubMarkers } from './ast-helpers.js';
 
 export function getInterfaceNameFromFileName(fileName: string): string {
   // Remove extension
@@ -46,10 +47,10 @@ export function parseInterface(content, interfaceName) {
 
 function generateDataTableCols(fields: string[]): string {
   const lines = fields.map(
-    (f) => `    { key: '${f}', label: '${readableCase(f)}', opt: {} }`
+    (f) => `      { key: '${f}', label: '${readableCase(f)}', opt: {} }`
   ).join(',\n');
 
-  return `static override get dataTableCols(): FieldDescriptor[] {\n  return [\n${lines}\n  ];\n}\n`;
+  return `  static override get dataTableCols(): FieldDescriptor[] {\n    return [\n${lines}\n    ];\n  }`;
 }
 
 function generateFormFields(fields: string[]): string {
@@ -59,16 +60,16 @@ function generateFormFields(fields: string[]): string {
     (f) => `    { key: '${f}', label: '${readableCase(f)}', opt: { validators: [Validators.required] } }`
   ).join(',\n');
 
-  return `static override formFields: FieldDescriptor[] = [\n${lines}\n  ];\n`;
+  return `  static override formFields: FieldDescriptor[] = [\n${lines}\n  ];`;
 }
 
 function generateSearchFormFields(fields: string[]): string {
   const lines = fields
   .map(
-    (f) => `   ${f}: { column: '${f}', operator: '=', value: null }`
+    (f) => `      ${f}: { column: '${f}', operator: '=', value: null }`
   ).join(',\n');
 
-  return `static override get searchForm() {\n   return {\n ${lines}\n }\n   };\n`;
+  return `  static override get searchForm() {\n    return {\n${lines}\n    };\n  }`;
 }
 
 //==========================================================================================
@@ -233,14 +234,19 @@ export async function enhanceModels(destPath: string, entities, hydrateMode = 'f
               fileContent = removePlaceholderComments(fileContent);
 
             } else {
-              // --- Fields Mode (default, static overrides) ---
+              // --- Fields Mode (default, static overrides via text) ---
+              fileContent = removeStubMarkers(fileContent);
+
               const dataTableCols = generateDataTableCols(fieldNames);
               const formFields = generateFormFields(fieldNames);
               const searchFormFields = generateSearchFormFields(fieldNames);
 
-              fileContent = fileContent.replace('/* LIST_VIEW_FIELDS */', dataTableCols);
-              fileContent = fileContent.replace('/* FORM_FIELDS */', formFields);
-              fileContent = fileContent.replace('/* SEARCH_FORM */', searchFormFields);
+              // Insert all three blocks before the class closing brace
+              const memberBlock = '\n' + dataTableCols + '\n\n' + formFields + '\n\n' + searchFormFields + '\n';
+              const lastBrace = fileContent.lastIndexOf('}');
+              if (lastBrace >= 0) {
+                fileContent = fileContent.slice(0, lastBrace).trimEnd() + '\n' + memberBlock + '}\n';
+              }
             }
 
             await fs.promises.writeFile(fullPath, fileContent, 'utf8');

@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy, effect, inject } from '@angular/core';
-import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType } from '@cartesianui/common';
+import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType, AppDatatableComponent } from '@cartesianui/common';
 import { _Library_Sandbox } from '../../_library_.sandbox';
 import { LISTING_IMPORTS } from '../../_library_.imports';
 import { _IEntity_, _Entity_ } from '../../models';
@@ -19,6 +19,7 @@ type _Entity_ChildComponent = typeof childComponents;
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
       ...LISTING_IMPORTS,
+      AppDatatableComponent,
       _Entity_CreateComponent,
       _Entity_EditComponent
     ],

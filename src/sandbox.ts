@@ -1,43 +1,69 @@
-import fs from 'fs-extra';
-import { pascalCase } from './strings.js';
-import { formatMultiLineImport, insertAtClassEnd } from './code-insert.js';
-import { replaceEntityPlaceHolders } from './placeholders.js';
+import { pascalCase, camelCase } from './strings.js';
+import { loadSourceFile, findClassExtending, buildImportLine, addImportToContent, readFile, writeFile } from './ast-helpers.js';
 
-export async function enhanceSandboxFileUsingMicroStub(targetFilePath, stubFile, entities, mode = 'new') {
+export async function enhanceSandboxFile(targetFilePath: string, entities: string[]) {
+  let content = await readFile(targetFilePath);
 
-  let content = await fs.readFile(targetFilePath, 'utf8');
-  let stubContent = await fs.readFile(stubFile, 'utf8');
+  // Use AST to check which properties already exist
+  const sourceFile = loadSourceFile(targetFilePath);
+  const sandboxClass = findClassExtending(sourceFile, 'Sandbox');
 
-  const importSet = new Set();
-  const stubContentSet = new Set();
+  if (!sandboxClass) {
+    throw new Error(`Could not find class extending Sandbox in ${targetFilePath}`);
+  }
 
-  const storeSet = new Set();
-  const modelSet = new Set();
+  const storeImports: string[] = [];
+  const modelImports: string[] = [];
+  const propertyBlocks: string[] = [];
 
   for (const entity of entities) {
     const pascalEntity = pascalCase(entity);
+    const camelEntity = camelCase(entity);
+    const selectorName = `from${pascalEntity}`;
+    const actionsName = `${pascalEntity}Actions`;
 
-    storeSet.add(`from${pascalEntity}`);
-    storeSet.add(`${pascalEntity}Actions`);
+    // Skip if property already exists
+    if (sandboxClass.getProperty(camelEntity)) {
+      continue;
+    }
 
-    modelSet.add(`${pascalEntity}`);
+    storeImports.push(selectorName, actionsName);
+    modelImports.push(pascalEntity);
 
-    stubContentSet.add(replaceEntityPlaceHolders(stubContent, entity))
+    propertyBlocks.push(
+      `  ${camelEntity} = new EntitySandbox<${pascalEntity}>(this.store, this.injector, {\n` +
+      `    selectors: ${selectorName},\n` +
+      `    actions: ${actionsName},\n` +
+      `    model: ${pascalEntity}\n` +
+      `  });`
+    );
   }
 
-  const storeImport = formatMultiLineImport(storeSet, './store');
-  const modelImport = formatMultiLineImport(modelSet, './models');
+  if (!propertyBlocks.length) {
+    return;
+  }
 
-  importSet.add(storeImport);
-  importSet.add(modelImport);
+  // Add imports
+  if (storeImports.length) {
+    content = addImportToContent(content, './store', storeImports);
+  }
+  if (modelImports.length) {
+    content = addImportToContent(content, './models', modelImports);
+  }
 
-  // Inject imports before @Injectable()
-  const importSection = Array.from(importSet).join('\n');
-  content = content.replace(/(@Injectable())/, `${importSection}\n\n$1`);
+  // Insert properties before the closing brace of the class
+  const classBody = propertyBlocks.join('\n\n');
+  // Find the last closing brace (class end)
+  const lastBrace = content.lastIndexOf('}');
+  if (lastBrace >= 0) {
+    const before = content.slice(0, lastBrace).trimEnd();
+    content = before + '\n\n' + classBody + '\n}\n';
+  }
 
-  const stubSection = Array.from(stubContentSet).join('\n\n\n');
+  await writeFile(targetFilePath, content);
+}
 
-  content = insertAtClassEnd(content, stubSection.trim());
-
-  await fs.writeFile(targetFilePath, content, 'utf8');
+// Backward-compatible alias (old signature accepted stubFile, now ignored)
+export async function enhanceSandboxFileUsingMicroStub(targetFilePath: string, _stubFile: string, entities: string[], _mode = 'new') {
+  return enhanceSandboxFile(targetFilePath, entities);
 }

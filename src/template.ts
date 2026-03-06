@@ -97,7 +97,7 @@ export async function copyTemplateContents(templateDir, destDir) {
   const entries = await fs.readdir(templateDir);
 
   for (const entry of entries) {
-    if (entry === 'stub' || entry === 'cui.ts') continue; // skip stub folder & cui.ts
+    if (entry === 'cui.ts') continue; // skip cui.ts
 
     const srcPath = path.join(templateDir, entry);
     const destPath = path.join(destDir, entry);

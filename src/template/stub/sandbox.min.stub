@@ -1,5 +1,0 @@
-  _entityName_ = new EntitySandbox<_Entity_>(this.store, this.injector, {
-    selectors: from_Entity_,
-    actions: _Entity_Actions,
-    model: _Entity_
-  });

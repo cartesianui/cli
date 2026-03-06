@@ -1,10 +1,8 @@
 <page-title [title]="'_PEntity_'"></page-title>
 <page-actions
   (delete)="onDelete()"
-  (import)="onSearch($event)" 
-  (export)="onSearch($event)" 
-  (searchChange)="onSearch($event)" 
-  (dateRangeChange)="onDateChange($event)" 
+  (searchChange)="onSearch($event)"
+  (dateRangeChange)="onDateChange($event)"
   (create)="showChildComponent(childComponents.createForm, 'createForm')"
   [disabled]="{
     delete: selected.length !== 1
@@ -33,60 +31,19 @@
   </div>
   <div class="card">
     <div class="card-body">
-      <ngx-datatable
-        class="material"
+      <app-datatable
         [rows]="sb._entityName_.entities()"
-        [columns]="headers"
-        [columnMode]="'force'"
-        [headerHeight]="50"
-        [footerHeight]="50"
-        [rowHeight]="43"
-        [externalPaging]="true"
+        [columns]="columns"
+        [headers]="headers"
+        [rowHeight]="50"
         [count]="sb._entityName_.pagination()?.total"
         [offset]="getOffsetFromPagination()"
         [limit]="sb._entityName_.pagination()?.perPage"
         [selected]="selected"
-        [selectionType]="'checkbox'"
-        (select)="onSelect($event)"
-        (page)="setPage($event)"
-        sortType="single"
-      >
-        <ngx-datatable-column
-          [width]="30"
-          [sortable]="false"
-          [canAutoResize]="false"
-          [draggable]="false"
-          [resizeable]="false"
-          [headerCheckboxable]="true"
-          [checkboxable]="true"
-        ></ngx-datatable-column>
-
-        <ngx-datatable-column 
-          *ngFor="let col of columns" 
-          [name]="col.label" 
-          [prop]="col.key" 
-          [width]="col?.opt?.width || undefined" 
-          [flexGrow]="col?.opt?.width ? 0 : 1" 
-          [minWidth]="col?.opt?.minWidth ?? '150'" 
-          [sortable]="true"
-        >
-          <ng-template let-row="row" ngx-datatable-cell-template>
-            <!-- Link Cell -->
-            <ng-container *ngIf="col?.opt?.link === true; else normalCell">
-              <a href="javascript:;" (click)="onEdit(row)">
-                {{ row.dtFormatted(col) }}
-              </a>
-            </ng-container>
-
-            <!-- Normal Cell -->
-            <ng-template #normalCell>
-              <span> 
-                  {{ row.dtFormatted(col) }}
-              </span>
-            </ng-template>
-          </ng-template>
-        </ngx-datatable-column>
-      </ngx-datatable>
+        (selectChange)="onSelect($event)"
+        (pageChange)="setPage($event)"
+        (editClick)="onEdit($event)"
+      ></app-datatable>
     </div>
   </div>
 </div>

@@ -1,11 +1,9 @@
-import fs from 'fs-extra';
 import path from 'path';
-import { kebabCase } from './strings.js';
 import { logInfo, logWarning, logSuccess, logError } from './logger.js';
 import { replaceSectionPlaceholders, replaceLibraryPlaceholders } from './placeholders.js';
 import { enhanceProviderFileWithEntities } from './providers.js';
-import { enhanceSandboxFileUsingMicroStub } from './sandbox.js';
-import { enhanceRoutingFileUsingStub } from './routes.js';
+import { enhanceSandboxFile } from './sandbox.js';
+import { enhanceRoutingFile } from './routes.js';
 import { enhanceIndexFile } from './index-file.js';
 import { copyEntityToLibrary, copyTemplateContents, findEntityTemplates, copyEntityTemplates, removeEntityTemplates } from './template.js';
 
@@ -30,17 +28,13 @@ export async function addEntity(section, library, entities, destPath: string, tp
   const providerFilePath = path.join(destSrc, 'lib', `${library}.providers.ts`);
   await enhanceProviderFileWithEntities(providerFilePath, entities);
 
-  logInfo('Updating sandbox file  content (min).');
+  logInfo('Updating sandbox file content.');
   const sandboxFilePath = path.join(destSrc, 'lib', `${library}.sandbox.ts`);
-  const microStubFile = entities.length > 1 ? 'sandbox.multi.stub' : 'sandbox.min.stub';
-  const sandboxMicroStubFilePath = path.join(tplPath, 'stub', microStubFile);
-  await enhanceSandboxFileUsingMicroStub(sandboxFilePath, sandboxMicroStubFilePath, entities, 'append');
+  await enhanceSandboxFile(sandboxFilePath, entities);
 
   logInfo('Updating routes file content.');
   const routingFilePath = path.join(destSrc, 'lib', `${library}.routes.ts`);
-  const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
-  const routingStubFilePath = path.join(tplPath, 'stub', routingStubFile);
-  await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities, 'append');
+  await enhanceRoutingFile(routingFilePath, entities);
 }
 
 export async function generateLibrary(sectionName, libraryName, entities, destPath: string, tplPath: string) {
@@ -85,19 +79,15 @@ export async function generateLibrary(sectionName, libraryName, entities, destPa
 
     logInfo('Generating providers file content.');
     const providersFilePath = path.join(libPath, `${libraryName}.providers.ts`);
-    await enhanceProviderFileWithEntities(providersFilePath, entities);;
+    await enhanceProviderFileWithEntities(providersFilePath, entities);
 
-    logInfo('Generating sandbox file content (min).');
+    logInfo('Generating sandbox file content.');
     const sandboxFilePath = path.join(libPath, `${libraryName}.sandbox.ts`);
-    const microStubFile = entities.length > 1 ? 'sandbox.min.stub' : 'sandbox.min.stub';
-    const sandboxMicroStubFilePath = path.join(tplPath, 'stub', microStubFile);
-    await enhanceSandboxFileUsingMicroStub(sandboxFilePath, sandboxMicroStubFilePath, entities);
+    await enhanceSandboxFile(sandboxFilePath, entities);
 
     logInfo('Generating routes file content.');
     const routingFilePath = path.join(libPath, `${libraryName}.routes.ts`);
-    const routingStubFile = entities.length > 1 ? 'routing.stub' : 'routing.stub';
-    const routingStubFilePath = path.join(tplPath, 'stub', routingStubFile);
-    await enhanceRoutingFileUsingStub(routingFilePath, routingStubFilePath, entities);
+    await enhanceRoutingFile(routingFilePath, entities);
 
     logSuccess('Library generated successfully.');
   } catch (err) {

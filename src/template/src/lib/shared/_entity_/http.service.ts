@@ -37,9 +37,4 @@ export class _Entity_HttpService extends HttpService implements IHttpService<_En
     return null;
   }
 
-  // @PATCH('/_Pentity-name_/{id}/activate')
-  // public activate(@Path('id') id: string): Observable<any> {
-  //   return null;
-  // }
-
 }

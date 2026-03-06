@@ -1,41 +1,74 @@
-import fs from 'fs-extra';
-import { pascalCase, kebabCase } from './strings.js';
-import { formatMultiLineImport, insertStubRoutes, insertImportSectionBeforeFirstExportConst } from './code-insert.js';
-import { replaceEntityPlaceHolders } from './placeholders.js';
+import { pascalCase, kebabCase, pluralize } from './strings.js';
+import { loadSourceFile, findChildrenArray, arrayHasElement, removeStubMarkers, addImportToContent, readFile, writeFile } from './ast-helpers.js';
 
-export async function enhanceRoutingFileUsingStub(targetFilePath, stubFile, entities, mode='new') {
+export async function enhanceRoutingFile(targetFilePath: string, entities: string[]) {
+  let content = await readFile(targetFilePath);
 
-  let content = await fs.readFile(targetFilePath, 'utf8');
-  let stubContent = await fs.readFile(stubFile, 'utf8');
+  // Remove any leftover /* STUB_CONTENT */ markers (backward compat)
+  content = removeStubMarkers(content);
 
-  const importSet = new Set();
-  const componentImportSet = new Set();
-  const stubContentSet = new Set();
+  // Use AST to check which routes already exist
+  const sourceFile = loadSourceFile(targetFilePath);
+  const childrenArray = findChildrenArray(sourceFile, 'routes');
+  if (!childrenArray) {
+    throw new Error(`Could not find 'children' array in routes variable in ${targetFilePath}`);
+  }
+
+  const routeLines: string[] = [];
+  const importLines: string[] = [];
 
   for (const entity of entities) {
     const pascalEntity = pascalCase(entity);
     const kebabEntity = kebabCase(entity);
+    const pluralKebab = kebabCase(pluralize(entity));
+    const componentName = `${pascalEntity}ListingComponent`;
 
-    const listingComponent = `${pascalEntity}ListingComponent`;
-    const listingImport = `import { ${listingComponent} } from './ui/${kebabEntity}/listing.component';`;
-    componentImportSet.add(listingImport);
+    // Skip if route already exists
+    if (arrayHasElement(childrenArray, `'${pluralKebab}'`)) {
+      continue;
+    }
 
-    let temp = replaceEntityPlaceHolders(stubContent, entity);
-
-    stubContentSet.add(temp);;
+    importLines.push(`import { ${componentName} } from './ui/${kebabEntity}/listing.component';`);
+    routeLines.push(`      { path: '${pluralKebab}', component: ${componentName} }`);
   }
 
-  const combinedImportSet = new Set([
-    ...importSet,
-    ...componentImportSet
-  ]);
+  if (!routeLines.length) {
+    await writeFile(targetFilePath, content);
+    return;
+  }
 
-  // Inject imports before route declaration
-  const importSection = Array.from(combinedImportSet).join('\n');
+  // Add imports before the export const routes line
+  const importBlock = importLines.join('\n');
+  content = content.replace(
+    /^(export const routes)/m,
+    `${importBlock}\n\n$1`
+  );
 
-  content = insertImportSectionBeforeFirstExportConst(content, importSection);
+  // Insert routes into children array
+  // Find `children: [` and insert before its closing `]`
+  const childrenMatch = content.match(/children:\s*\[([^\]]*)\]/s);
+  if (childrenMatch && childrenMatch.index !== undefined) {
+    const fullMatch = childrenMatch[0];
+    const innerContent = childrenMatch[1].trim();
+    const routeBlock = routeLines.join(',\n');
 
-  content = insertStubRoutes(content, stubContentSet, mode, true);
+    let newChildren: string;
+    if (innerContent) {
+      // Existing routes — ensure trailing comma on last existing route
+      const trimmedInner = innerContent.replace(/,?\s*$/, ',');
+      newChildren = `children: [\n      ${trimmedInner}\n${routeBlock},\n    ]`;
+    } else {
+      // Empty children array
+      newChildren = `children: [\n${routeBlock}\n    ]`;
+    }
 
-  await fs.writeFile(targetFilePath, content, 'utf8');
+    content = content.slice(0, childrenMatch.index) + newChildren + content.slice(childrenMatch.index + fullMatch.length);
+  }
+
+  await writeFile(targetFilePath, content);
+}
+
+// Backward-compatible alias (old signature accepted stubFile, now ignored)
+export async function enhanceRoutingFileUsingStub(targetFilePath: string, _stubFile: string, entities: string[], _mode = 'new') {
+  return enhanceRoutingFile(targetFilePath, entities);
 }
