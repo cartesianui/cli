@@ -53,7 +53,7 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
   }
 
   protected list(): void {
-    this.sb._entityName_.fetchAll(this.criteria.httpParams());
+    this.sb._entityName_.getAll(this.criteria.httpParams());
   }
 
   onEdit(entity: _Entity_): void {

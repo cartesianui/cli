@@ -1,6 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { FlagDef, FLAG_LIB, FLAG_ENTITIES, FLAG_SECTION, FLAG_DEST, FLAG_FORCE, FLAG_TPL, FLAG_HYDRATE, FLAG_ACTION, FLAG_ENTITY_SINGLE } from './args.js';
+import { FlagDef, FLAG_LIB, FLAG_ENTITIES, FLAG_SECTION, FLAG_DEST, FLAG_FORCE, FLAG_TPL, FLAG_HYDRATE, FLAG_ACTION, FLAG_ENTITY_SINGLE, FLAG_TYPE } from './args.js';
 import { generateLibrary, addEntity } from './library.js';
 import { enhanceModels } from './models.js';
 import { enhanceFormHtml } from './forms.js';
@@ -124,18 +124,21 @@ export const COMMANDS: CommandDef[] = [
       {
         name: 'entity',
         description: 'Add a custom action chain (HTTP + action + reducer + effect + sandbox)',
-        flags: [FLAG_LIB, FLAG_ENTITY_SINGLE, FLAG_ACTION, FLAG_DEST],
+        flags: [FLAG_LIB, FLAG_ENTITY_SINGLE, FLAG_ACTION, FLAG_TYPE, FLAG_DEST],
         examples: [
           'cui extend entity --lib=care --entity=Visit --action=getOpenVisits',
-          'cui extend entity -l care -e Visit -a getOpenVisits',
+          'cui extend entity --lib=care --entity=Visit --action=getOpenVisits --type=get',
+          'cui extend entity --lib=pos --entity=Cart --action=getMyCarts --type=list',
+          'cui extend entity --lib=care --entity=Visit --action=closeVisit --type=update',
         ],
         run: async (flags) => {
           const library = (flags.lib as string).toLowerCase();
           const entity = flags.entity as string;
           const actionName = flags.action as string;
+          const actionType = (flags.type as string) || 'get';
           const dest = (flags.dest as string) || library;
           const destPath = path.join(process.cwd(), dest);
-          await extendEntity(destPath, entity, actionName);
+          await extendEntity(destPath, entity, actionName, actionType);
         },
       },
     ],

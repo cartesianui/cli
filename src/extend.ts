@@ -4,13 +4,139 @@ import { logInfo, logSuccess, logError } from './logger.js';
 import { pascalCase, camelCase, kebabCase, pluralize } from './strings.js';
 import { readFile, writeFile, addImportToContent } from './ast-helpers.js';
 
-export async function extendEntity(destPath: string, entity: string, actionName: string) {
+// ─── Action Signature Types ─────────────────────────────────────────────────
+
+export type ActionType = 'get' | 'list' | 'create' | 'update' | 'delete';
+
+const VALID_ACTION_TYPES: ActionType[] = ['get', 'list', 'create', 'update', 'delete'];
+
+interface ActionSignature {
+  // Action props: e.g. { id: string } or { criteria: RequestCriteriaOuput }
+  actionProps: string;
+  // Success action props
+  successProps: string;
+  // HTTP service type signature: e.g. (id: string) => Observable<ICartesianResponse>
+  httpTypeSig: (pascal: string) => string;
+  // HTTP method decorator + params
+  httpMethod: (actionName: string, pluralKebab: string, pascal: string) => string;
+  // Effect destructure from action + httpService call
+  effectDestructure: string;
+  effectHttpCall: (actionName: string) => string;
+  effectSuccessMap: (pascal: string, actionName: string) => string;
+  // Sandbox dispatch params + call
+  sandboxParams: (pascal: string) => string;
+  sandboxDispatch: (actionsName: string, actionName: string) => string;
+  // Extra imports needed
+  extraImports?: { module: string; symbols: string[] }[];
+}
+
+function getSignature(type: ActionType, pascal: string): ActionSignature {
+  switch (type) {
+    case 'get':
+      return {
+        actionProps: '{ id: string }',
+        successProps: `{ entity: ${pascal} }`,
+        httpTypeSig: () => '(id: string) => Observable<ICartesianResponse>',
+        httpMethod: (actionName, pluralKebab) =>
+          `\n  @GET('/${pluralKebab}/{id}/${kebabCase(actionName)}')` +
+          `\n  public ${actionName}(@Path('id') id: string): Observable<any> {` +
+          `\n    return null;` +
+          `\n  }\n`,
+        effectDestructure: '({ id })',
+        effectHttpCall: (actionName) => `this.httpService.${actionName}(id)`,
+        effectSuccessMap: (p, a) => `${p}Actions.${a}Success({ entity: data })`,
+        sandboxParams: () => 'id: string',
+        sandboxDispatch: (actionsName, actionName) => `${actionsName}.${actionName}({ id })`,
+      };
+
+    case 'list':
+      return {
+        actionProps: '{ criteria: RequestCriteriaOuput }',
+        successProps: `{ entities: ${pascal}[]; meta?: any }`,
+        httpTypeSig: () => '(criteria: RequestCriteriaOuput) => Observable<ICartesianResponse>',
+        httpMethod: (actionName, pluralKebab) =>
+          `\n  @GET('/${pluralKebab}/${kebabCase(actionName)}')` +
+          `\n  public ${actionName}(@Criteria criteria: RequestCriteriaOuput): Observable<any> {` +
+          `\n    return null;` +
+          `\n  }\n`,
+        effectDestructure: '({ criteria })',
+        effectHttpCall: (actionName) => `this.httpService.${actionName}(criteria)`,
+        effectSuccessMap: (p, a) => `${p}Actions.${a}Success({ entities: data, meta })`,
+        sandboxParams: () => 'criteria: RequestCriteriaOuput = null',
+        sandboxDispatch: (actionsName, actionName) => `${actionsName}.${actionName}({ criteria })`,
+        extraImports: [{ module: '@cartesianui/core', symbols: ['RequestCriteriaOuput'] }],
+      };
+
+    case 'create':
+      return {
+        actionProps: `{ entity: ${pascal} }`,
+        successProps: `{ entity: ${pascal} }`,
+        httpTypeSig: (p) => `(model: ${p}) => Observable<ICartesianResponse>`,
+        httpMethod: (actionName, pluralKebab, p) =>
+          `\n  @POST('/${pluralKebab}/${kebabCase(actionName)}')` +
+          `\n  public ${actionName}(@Body body: ${p}): Observable<any> {` +
+          `\n    return null;` +
+          `\n  }\n`,
+        effectDestructure: '({ entity })',
+        effectHttpCall: (actionName) => `this.httpService.${actionName}(entity)`,
+        effectSuccessMap: (p, a) => `${p}Actions.${a}Success({ entity: data })`,
+        sandboxParams: (p) => `entity: ${p}`,
+        sandboxDispatch: (actionsName, actionName) => `${actionsName}.${actionName}({ entity })`,
+      };
+
+    case 'update':
+      return {
+        actionProps: `{ id: string; changes: Partial<${pascal}> }`,
+        successProps: `{ entity: ${pascal} }`,
+        httpTypeSig: (p) => `(id: string, changes: Partial<${p}>) => Observable<ICartesianResponse>`,
+        httpMethod: (actionName, pluralKebab, p) =>
+          `\n  @PATCH('/${pluralKebab}/{id}/${kebabCase(actionName)}')` +
+          `\n  public ${actionName}(@Path('id') id: string, @Body body: Partial<${p}>): Observable<any> {` +
+          `\n    return null;` +
+          `\n  }\n`,
+        effectDestructure: '({ id, changes })',
+        effectHttpCall: (actionName) => `this.httpService.${actionName}(id, changes)`,
+        effectSuccessMap: (p, a) => `${p}Actions.${a}Success({ entity: data })`,
+        sandboxParams: (p) => `id: string, changes: Partial<${p}>`,
+        sandboxDispatch: (actionsName, actionName) => `${actionsName}.${actionName}({ id, changes })`,
+      };
+
+    case 'delete':
+      return {
+        actionProps: '{ id: string }',
+        successProps: `{ entity: ${pascal} }`,
+        httpTypeSig: () => '(id: string) => Observable<ICartesianResponse>',
+        httpMethod: (actionName, pluralKebab) =>
+          `\n  @DELETE('/${pluralKebab}/{id}/${kebabCase(actionName)}')` +
+          `\n  public ${actionName}(@Path('id') id: string): Observable<any> {` +
+          `\n    return null;` +
+          `\n  }\n`,
+        effectDestructure: '({ id })',
+        effectHttpCall: (actionName) => `this.httpService.${actionName}(id)`,
+        effectSuccessMap: (p, a) => `${p}Actions.${a}Success({ entity: data })`,
+        sandboxParams: () => 'id: string',
+        sandboxDispatch: (actionsName, actionName) => `${actionsName}.${actionName}({ id })`,
+      };
+  }
+}
+
+// ─── Main Entry ──────────────────────────────────────────────────────────────
+
+export async function extendEntity(destPath: string, entity: string, actionName: string, actionType: string = 'get') {
+  const type = actionType.toLowerCase() as ActionType;
+  if (!VALID_ACTION_TYPES.includes(type)) {
+    logError(`Invalid action type: "${actionType}". Must be one of: ${VALID_ACTION_TYPES.join(', ')}`);
+    return;
+  }
+
   const pascal = pascalCase(entity);
   const kebab = kebabCase(entity);
   const camel = camelCase(entity);
   const pluralKebab = kebabCase(pluralize(entity));
   const pluralPascal = pascalCase(pluralize(entity));
   const pluralCamel = camelCase(pluralize(entity));
+
+  const sig = getSignature(type, pascal);
 
   const libPath = path.join(destPath, 'src', 'lib');
   const actionsPath = path.join(libPath, 'store', kebab, 'actions.ts');
@@ -33,15 +159,15 @@ export async function extendEntity(destPath: string, entity: string, actionName:
   const actionsContent = await readFile(actionsPath);
   const isFirstExtension = !hasUncommentedAdditionalActions(actionsContent);
 
-  logInfo(`Extending ${pascal} with action: ${actionName} (${isFirstExtension ? 'first extension' : 'appending'})`);
+  logInfo(`Extending ${pascal} with action: ${actionName} (type: ${type}, ${isFirstExtension ? 'first extension' : 'appending'})`);
 
-  await extendHttpService(httpServicePath, pascal, actionName, pluralKebab, isFirstExtension);
-  await extendActions(actionsPath, pascal, actionName, isFirstExtension);
+  await extendHttpService(httpServicePath, pascal, actionName, pluralKebab, isFirstExtension, sig);
+  await extendActions(actionsPath, pascal, actionName, isFirstExtension, sig);
   await extendReducer(reducerPath, pascal, actionName, pluralCamel, pluralPascal, isFirstExtension);
-  await extendEffect(effectPath, pascal, actionName, isFirstExtension);
+  await extendEffect(effectPath, pascal, actionName, isFirstExtension, sig);
 
   if (sandboxPath) {
-    await extendSandbox(sandboxPath, pascal, camel, actionName, isFirstExtension);
+    await extendSandbox(sandboxPath, pascal, camel, actionName, isFirstExtension, sig);
   } else {
     logInfo('Sandbox file not found — skipping sandbox extension.');
   }
@@ -68,20 +194,29 @@ async function findSandboxFile(libPath: string): Promise<string | null> {
 // ─── HTTP Service ───────────────────────────────────────────────────────────
 
 async function extendHttpService(
-  filePath: string, pascal: string, actionName: string, pluralKebab: string, isFirst: boolean
+  filePath: string, pascal: string, actionName: string, pluralKebab: string,
+  isFirst: boolean, sig: ActionSignature
 ) {
   let content = await readFile(filePath);
-  const kebabAction = kebabCase(actionName);
 
   // Add ICartesianResponse import if missing
   content = addImportToContent(content, '@cartesianui/core', ['ICartesianResponse']);
+
+  // Add extra imports from signature (e.g. RequestCriteriaOuput for list type)
+  if (sig.extraImports) {
+    for (const imp of sig.extraImports) {
+      content = addImportToContent(content, imp.module, imp.symbols);
+    }
+  }
+
+  const typeSig = sig.httpTypeSig(pascal);
 
   if (isFirst) {
     // Replace empty extension type: export type I{Entity}HttpServiceExtension = {};
     const emptyTypeRegex = new RegExp(
       `export\\s+type\\s+I${pascal}HttpServiceExtension\\s*=\\s*\\{\\s*\\};`
     );
-    const methodSig = `  ${actionName}: (id: string) => Observable<ICartesianResponse>;`;
+    const methodSig = `  ${actionName}: ${typeSig};`;
     content = content.replace(
       emptyTypeRegex,
       `export type I${pascal}HttpServiceExtension = {\n${methodSig}\n};`
@@ -102,16 +237,12 @@ async function extendHttpService(
     const typeRegex = new RegExp(
       `(export\\s+type\\s+I${pascal}HttpServiceExtension\\s*=\\s*\\{[^}]*)(\\};)`
     );
-    const methodSig = `  ${actionName}: (id: string) => Observable<ICartesianResponse>;\n`;
+    const methodSig = `  ${actionName}: ${typeSig};\n`;
     content = content.replace(typeRegex, `$1${methodSig}$2`);
   }
 
   // Add HTTP method before class closing brace
-  const httpMethod =
-    `\n  @GET('/${pluralKebab}/{id}/${kebabAction}')` +
-    `\n  public ${actionName}(@Path('id') id: string): Observable<any> {` +
-    `\n    return null;` +
-    `\n  }\n`;
+  const httpMethod = sig.httpMethod(actionName, pluralKebab, pascal);
 
   const lastBrace = content.lastIndexOf('}');
   if (lastBrace >= 0) {
@@ -125,7 +256,8 @@ async function extendHttpService(
 // ─── Actions ────────────────────────────────────────────────────────────────
 
 async function extendActions(
-  filePath: string, pascal: string, actionName: string, isFirst: boolean
+  filePath: string, pascal: string, actionName: string,
+  isFirst: boolean, sig: ActionSignature
 ) {
   let content = await readFile(filePath);
   const readableName = readableActionName(pascal, actionName);
@@ -133,9 +265,16 @@ async function extendActions(
   // Add ngrx imports
   content = addImportToContent(content, '@ngrx/store', ['createAction', 'props']);
 
+  // Add extra imports from signature
+  if (sig.extraImports) {
+    for (const imp of sig.extraImports) {
+      content = addImportToContent(content, imp.module, imp.symbols);
+    }
+  }
+
   const triplet =
-    `  ${actionName}: createAction('[${pascal}] ${readableName}', props<{ id: string }>()),\n` +
-    `  ${actionName}Success: createAction('[${pascal}] ${readableName} Success', props<{ entity: ${pascal} }>()),\n` +
+    `  ${actionName}: createAction('[${pascal}] ${readableName}', props<${sig.actionProps}>()),\n` +
+    `  ${actionName}Success: createAction('[${pascal}] ${readableName} Success', props<${sig.successProps}>()),\n` +
     `  ${actionName}Failure: createAction('[${pascal}] ${readableName} Failure', props<{ message: string; errors?: any }>()),`;
 
   if (isFirst) {
@@ -293,7 +432,8 @@ export const from${pascal} = {
 // ─── Effect ─────────────────────────────────────────────────────────────────
 
 async function extendEffect(
-  filePath: string, pascal: string, actionName: string, isFirst: boolean
+  filePath: string, pascal: string, actionName: string,
+  isFirst: boolean, sig: ActionSignature
 ) {
   let content = await readFile(filePath);
 
@@ -302,6 +442,13 @@ async function extendEffect(
   content = addImportToContent(content, 'rxjs', ['of', 'switchMap', 'map', 'catchError']);
   content = addImportToContent(content, '@cartesianui/core', ['ICartesianResponse']);
   content = addImportToContent(content, '../../shared', [`I${pascal}HttpServiceExtension`]);
+
+  // Add extra imports from signature
+  if (sig.extraImports) {
+    for (const imp of sig.extraImports) {
+      content = addImportToContent(content, imp.module, imp.symbols);
+    }
+  }
 
   if (isFirst) {
     // Change EntityEffect<Entity> to EntityEffect<Entity, IEntityHttpServiceExtension>
@@ -323,9 +470,9 @@ async function extendEffect(
     `    this.actions$.pipe(\n` +
     `      ofType(${pascal}Actions.${actionName}),\n` +
     `      map((action: any) => action),\n` +
-    `      switchMap(({ id }) => {\n` +
-    `        return this.httpService.${actionName}(id).pipe(\n` +
-    `          map(({ data }: ICartesianResponse) => ${pascal}Actions.${actionName}Success({ entity: data })),\n` +
+    `      switchMap(${sig.effectDestructure} => {\n` +
+    `        return ${sig.effectHttpCall(actionName)}.pipe(\n` +
+    `          map(({ data, meta }: ICartesianResponse) => ${sig.effectSuccessMap(pascal, actionName)}),\n` +
     `          catchError(({ errors, message }: ICartesianResponse) =>\n` +
     `            of(${pascal}Actions.${actionName}Failure({ errors, message }))\n` +
     `          )\n` +
@@ -347,7 +494,8 @@ async function extendEffect(
 // ─── Sandbox ────────────────────────────────────────────────────────────────
 
 async function extendSandbox(
-  filePath: string, pascal: string, camel: string, actionName: string, isFirst: boolean
+  filePath: string, pascal: string, camel: string, actionName: string,
+  isFirst: boolean, sig: ActionSignature
 ) {
   let content = await readFile(filePath);
   const requestProp = `${actionName}Request`;
@@ -362,14 +510,24 @@ async function extendSandbox(
   content = addImportToContent(content, '@cartesianui/common', ['RequestState']);
   content = addImportToContent(content, './store', [selectorName, actionsName]);
 
+  // Add extra imports from signature
+  if (sig.extraImports) {
+    for (const imp of sig.extraImports) {
+      content = addImportToContent(content, imp.module, imp.symbols);
+    }
+  }
+
   // Build the property + dispatch blocks
   const propBlock =
     `\n  ${requestProp}$ = this.store.pipe(select(${selectorName}.${requestProp}));` +
     `\n  readonly ${requestProp} = toSignal(this.${requestProp}$, { initialValue: undefined });\n`;
 
+  const params = sig.sandboxParams(pascal);
+  const dispatch = sig.sandboxDispatch(actionsName, actionName);
+
   const dispatchBlock =
-    `\n  ${actionName}(id: string): void {` +
-    `\n    this.store.dispatch(${actionsName}.${actionName}({ id }));` +
+    `\n  ${actionName}(${params}): void {` +
+    `\n    this.store.dispatch(${dispatch});` +
     `\n  }\n`;
 
   // Insert before class closing brace

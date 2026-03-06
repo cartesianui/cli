@@ -21,6 +21,6 @@ export class EntryComponent extends BaseComponent {
     console.log('📦 _Library_ feature initialized');
     // Pre-load any data
     // Here you can load any common data in store state
-    // e.g. this.sb.{anyEntity}.fetchAll({} as RequestCriteriaOuput, true);
+    // e.g. this.sb.{anyEntity}.getAll({} as RequestCriteriaOuput, true);
   }
 }

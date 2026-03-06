@@ -114,3 +114,4 @@ export const FLAG_HYDRATE: FlagDef = { long: 'hydrate', description: 'Hydration 
 export const FLAG_HELP: FlagDef = { long: 'help', short: 'h', description: 'Show help', boolean: true };
 export const FLAG_ACTION: FlagDef = { long: 'action', short: 'a', description: 'Custom action name (camelCase, e.g., getOpenVisits)', required: true };
 export const FLAG_ENTITY_SINGLE: FlagDef = { long: 'entity', short: 'e', description: 'Entity name to extend', required: true };
+export const FLAG_TYPE: FlagDef = { long: 'type', short: 't', description: 'Action signature type: get | list | create | update | delete', default: 'get' };
