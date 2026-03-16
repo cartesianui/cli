@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { IHttpService, HttpService, POST, GET, Body, Criteria, DefaultHeaders, RequestCriteriaOuput, Path, DELETE, PATCH, PUT } from '@cartesianui/core';
+import { IHttpService, HttpService, POST, GET, Body, Criteria, DefaultHeaders, RequestCriteriaOuput, Path, Query, DELETE, PATCH, PUT } from '@cartesianui/core';
 import { _Entity_ } from '../../models';
 
 export type I_Entity_HttpServiceExtension = {};
@@ -18,7 +18,7 @@ export class _Entity_HttpService extends HttpService implements IHttpService<_En
   }
 
   @GET('/_Pentity-name_/{id}')
-  public getById(@Path('id') id: string): Observable<any> {
+  public getById(@Path('id') id: string, @Query('include') includes?: string): Observable<any> {
     return null;
   }
 
