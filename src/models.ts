@@ -72,6 +72,32 @@ function generateSearchFormFields(fields: string[]): string {
   return `  static override get searchForm() {\n    return {\n${lines}\n    };\n  }`;
 }
 
+function generateSearchFields(fields: string[]): string {
+  const lines = fields
+    .filter(f => f.trim().toLowerCase() !== 'id')
+    .map(f => {
+      // Detect entity references (fields ending in Id)
+      if (f.endsWith('Id') && f !== 'id') {
+        const entity = f.replace(/Id$/, '');
+        const label = readableCase(entity);
+        const url = '/' + kebabCase(entity) + 's';
+        return `    { key: '${f}', label: '${label}', type: 'entity', url: '${url}' }`;
+      }
+      // First text field gets 'like' operator
+      return `    '${f}'`;
+    });
+
+  // Make the first text field use :like
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith("    '")) {
+      lines[i] = lines[i].replace(/^    '(\w+)'/, "    '$1:like'");
+      break;
+    }
+  }
+
+  return lines.join(',\n');
+}
+
 //==========================================================================================
 //                         Hydration: Entity Decorator (@EntityMeta)
 //==========================================================================================
@@ -87,9 +113,7 @@ function generateEntityMeta(fields: string[]): string {
     f => `    { key: '${f}', label: '${readableCase(f)}', opt: { validators: [Validators.required] } }`
   ).join(',\n');
 
-  const searchLines = fields.map(
-    f => `    ${f}: { column: '${f}', operator: '=', value: null }`
-  ).join(',\n');
+  const searchLines = generateSearchFields(fields);
 
   return `@EntityMeta({
   list: [
@@ -98,9 +122,9 @@ ${listLines}
   form: [
 ${formLines}
   ],
-  search: {
+  search: [
 ${searchLines}
-  }
+  ]
 })`;
 }
 

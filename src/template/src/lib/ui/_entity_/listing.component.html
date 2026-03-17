@@ -1,8 +1,6 @@
 <page-title [title]="'_PEntity_'"></page-title>
 <page-actions
   (delete)="onDelete()"
-  (searchChange)="onSearch($event)"
-  (dateRangeChange)="onDateChange($event)"
   (create)="showChildComponent(childComponents.createForm, 'createForm')"
   [disabled]="{
     delete: selected.length !== 1
@@ -24,11 +22,7 @@
 </app-offcanvas>
 
 <div class="main-content dt" #dtContainer>
-  <div class="row">
-    <div class="col-md-12 my-2">
-      <span class="float-end">Total: {{ sb._entityName_.pagination()?.total }}</span>
-    </div>
-  </div>
+  <search-panel [fields]="searchFields" [criteria]="criteria" searchKey="name" searchPlaceholder="Search _PEntity_..."></search-panel>
   <div class="card">
     <div class="card-body">
       <app-datatable

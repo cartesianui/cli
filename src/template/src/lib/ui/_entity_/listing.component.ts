@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, OnInit, AfterViewInit, OnDestroy, effect, inject } from '@angular/core';
-import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType, AppDatatableComponent } from '@cartesianui/common';
+import { ListingControlsComponent, ENTITY_CONSTRUCTOR, RequestType, AppDatatableComponent, SearchPanelComponent } from '@cartesianui/common';
 import { _Library_Sandbox } from '../../_library_.sandbox';
 import { LISTING_IMPORTS } from '../../_library_.imports';
 import { _IEntity_, _Entity_ } from '../../models';
@@ -20,6 +20,7 @@ type _Entity_ChildComponent = typeof childComponents;
     imports: [
       ...LISTING_IMPORTS,
       AppDatatableComponent,
+      SearchPanelComponent,
       _Entity_CreateComponent,
       _Entity_EditComponent
     ],
@@ -70,14 +71,5 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
           }
       });
     }
-  }
-
-  onSearch($event: { text: string }) {
-    this.criteria.page(1);
-    this.criteria.updateForm('name', $event.text);
-  }
-
-  onDateChange($event: { start: string, end: string }) {
-    console.log($event);
   }
 }
