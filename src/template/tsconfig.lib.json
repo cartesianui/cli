@@ -1,4 +1,14 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
+/* To learn more about this file see: https://angular.io/config/tsconfig.
+ *
+ * `extends: ../../tsconfig.json` assumes a flat `projects/<lib>/` layout.
+ * For section-nested libs (`projects/<section>/<lib>/` — accounting,
+ * shopifier, etc.) this path resolves to a non-existent
+ * `projects/tsconfig.json`, so standalone `ng build <lib>` fails with
+ * TS5012. This is consistent with how every shopifier lib in the workspace
+ * is configured today; `ng serve admin` resolves via path aliases in
+ * `tsconfig.admin.json` and works fine. Fix would require a workspace-wide
+ * pass to bump every nested lib's depth — out of scope for the cli.
+ */
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {

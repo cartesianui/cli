@@ -1,5 +1,12 @@
-export function pascalCase(str) {
-  return str.replace(/(^\w|_\w)/g, match => match.replace('_', '').toUpperCase());
+export function pascalCase(str: string): string {
+  return str
+    // Strip any `-`, `_`, or whitespace runs and capitalize the
+    // character that follows. Handles single-word ("core"), snake_case
+    // ("ledger_account"), kebab-case ("ledger-account"), and PascalCase
+    // ("LedgerAccount") inputs uniformly.
+    .replace(/[-_\s]+(.)/g, (_, c) => c.toUpperCase())
+    // Ensure the first character is uppercase regardless of input casing.
+    .replace(/^(.)/, c => c.toUpperCase());
 }
 
 export function kebabCase(str) {
