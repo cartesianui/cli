@@ -48,6 +48,14 @@ export class _Entity_ListingComponent extends ListingControlsComponent<_IEntity_
     this.sb._entityName_.clearRequestState(RequestType.Get);
   });
 
+  // handle delete success — notify + refresh the list
+  private readonly deleteCompleteEffect = effect(() => {
+    if (!this.sb._entityName_.deleteCompleted()) return;
+    this.notify.success('Successfully Deleted', 'Success');
+    this.sb._entityName_.clearRequestState(RequestType.Delete);
+    this.list();
+  });
+
   ngOnInit(): void {
     this.loadEntityMetadata();
     this.initCriteria();

@@ -1,22 +1,29 @@
-<default-actions
-  (save)="onSave()"
-  [disabled]="{
-    save: formGroup.invalid
-  }"
-></default-actions>
-
 <div class="main-content" #formContainer>
   <form novalidate autocomplete="off" [formGroup]="formGroup">
-    <div class="row">
-      <div class="col-md-12">
-        <div class="card">
-          <div class="card-header">
-            <strong>Update _Entity_</strong>
-          </div>
-          <div class="card-body">
-            <!-- FORM PLACE HOLDER -->
-          </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="form-card-icon"><i class="fa fa-pen"></i></span>
+        <div>
+          <h1 class="form-card-title">Update _Entity_</h1>
+          <div class="form-card-subtitle">Edit this _entity_ record</div>
         </div>
+        <default-actions
+          (save)="onSave()"
+          [disabled]="{
+            save: formGroup.invalid
+          }"
+        ></default-actions>
+      </div>
+      <div class="card-body">
+        <!-- FORM PLACE HOLDER -->
+      </div>
+      <div class="card-footer">
+        <default-actions
+          (save)="onSave()"
+          [disabled]="{
+            save: formGroup.invalid
+          }"
+        ></default-actions>
       </div>
     </div>
   </form>
